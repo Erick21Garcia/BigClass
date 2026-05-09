@@ -29,7 +29,7 @@ class EnrollmentController extends Controller
                 'enrollment_date' => $enrollment->enrollment_date?->format('Y-m-d'),
                 'type'            => $enrollment->type,
                 'status'          => $enrollment->status,
-                'is_active'       => $enrollment->is_active,
+                'active'       => $enrollment->active,
                 'student'         => [
                     'id'        => $enrollment->student->id,
                     'full_name' => $enrollment->student->person->full_name,
@@ -117,7 +117,7 @@ class EnrollmentController extends Controller
                 'enrollment_date' => $enrollment->enrollment_date?->format('Y-m-d'),
                 'type'            => $enrollment->type,
                 'status'          => $enrollment->status,
-                'is_active'       => $enrollment->is_active,
+                'active'       => $enrollment->active,
                 'student'         => [
                     'id'        => $enrollment->student->id,
                     'full_name' => $enrollment->student->person->full_name,

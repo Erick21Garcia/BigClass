@@ -5,6 +5,7 @@ namespace Modules\Academic\Providers;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Nwidart\Modules\Traits\PathNamespace;
+use Modules\Academic\Console\Commands\ClosePeriodCommand;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
@@ -43,7 +44,9 @@ class AcademicServiceProvider extends ServiceProvider
      */
     protected function registerCommands(): void
     {
-        // $this->commands([]);
+        $this->commands([
+            ClosePeriodCommand::class,
+        ]);
     }
 
     /**

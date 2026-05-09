@@ -16,7 +16,7 @@ class ScheduleController extends Controller
 {
     public function index()
     {
-        $academicPeriods = AcademicPeriod::where('is_active', true)
+        $academicPeriods = AcademicPeriod::where('active', true)
             ->orderByDesc('id')
             ->get(['id', 'name']);
 

@@ -2,11 +2,15 @@
 
 namespace Modules\Academic\Models;
 
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Schedule extends Model
 {
+    use LogsActivity;
+    
     protected $fillable = [
         'section_id', 
         'classroom_id', 
@@ -50,4 +54,12 @@ class Schedule extends Model
     {
         return self::DAYS[$this->day_of_week] ?? 'Desconocido';
     }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['section_id', 'classroom_id', 'day_of_week', 'start_time', 'end_time', 'active'])
+            ->logOnlyDirty();
+    }
+
 }

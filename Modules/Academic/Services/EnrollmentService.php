@@ -68,7 +68,7 @@ class EnrollmentService
 
     public function delete(Enrollment $enrollment): void
     {
-        if ($enrollment->is_active) {
+        if ($enrollment->active) {
             throw new \DomainException('No se puede eliminar una matrícula activa.');
         }
 

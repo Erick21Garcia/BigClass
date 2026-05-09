@@ -6,6 +6,7 @@ use Laravel\Fortify\Features;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\DashboardController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -14,19 +15,13 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('dashboard', function () {
+
+    // Rutas de dashboards
     $user = request()->user();
-    
-    if ($user->hasRole('admin')) {
-        return Inertia::render('dashboards/DashboardAdmin');
-    }
-    
-    if ($user->hasRole('docente')) {
-        return Inertia::render('dashboards/DashboardDocente');
-    }
-    
-    if ($user->hasRole('estudiante')) {
-        return Inertia::render('dashboards/DashboardEstudiante');
-    }
+
+    if ($user->hasRole('admin'))      return app(DashboardController::class)->admin();
+    if ($user->hasRole('docente'))    return app(DashboardController::class)->docente(request());
+    if ($user->hasRole('estudiante')) return app(DashboardController::class)->estudiante(request());
 
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');

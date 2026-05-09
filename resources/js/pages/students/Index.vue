@@ -2,7 +2,7 @@
 import type { ColumnDef } from '@tanstack/vue-table';
 import { h, ref } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Plus, GraduationCap } from 'lucide-vue-next';
+import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Plus, GraduationCap, ScrollText } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -209,6 +209,11 @@ const columns: ColumnDef<Student>[] = [
                             h(DropdownMenuItem, {
                                 onClick: () => openEditDialog(student),
                             }, () => [h(Pencil, { class: 'mr-2 h-4 w-4' }), 'Editar']),
+                            h(DropdownMenuSeparator),
+                            h(DropdownMenuItem, {
+                                onClick: () => window.open(`/reports/student/${student.id}/kardex`, '_blank'),
+                            }, () => [h(ScrollText, { class: 'mr-2 h-4 w-4' }), 'Descargar Kardex']),
+                            h(DropdownMenuSeparator),
                             h(DropdownMenuItem, {
                                 class: 'text-destructive',
                                 onClick: () => openDeleteDialog(student),

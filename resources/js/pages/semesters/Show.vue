@@ -2,7 +2,8 @@
 import axios from 'axios';
 import { ref } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { Calendar, Pencil, Trash2, UserPlus, GraduationCap, ClipboardList } from 'lucide-vue-next';
+import { Calendar, Pencil, Trash2, UserPlus, GraduationCap, 
+        ClipboardList, FileText, FileBarChart, FileSpreadsheet  } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -240,6 +241,50 @@ const gradeStatusVariant = (status: string): 'default' | 'secondary' | 'destruct
     reprobado:  'destructive',
     en_curso:   'secondary',
 } as const)[status] ?? 'secondary';
+
+const downloadReport = (url: string) => {
+    window.open(url, '_blank');
+};
+
+const actDialogOpen  = ref(false);
+const actPeriodId    = ref('');
+const actSectionId   = ref('');
+const actSections    = ref<{ id: number; name: string; subject: string; }[]>([]);
+const loadingSections = ref(false);
+
+// Cargar secciones cuando cambia el período
+const loadSections = async () => {
+    if (!actPeriodId.value) return;
+    loadingSections.value = true;
+    try {
+        const res = await axios.get('/schedules/events', {
+            params: { academic_period_id: actPeriodId.value },
+        });
+        // Agrupar por section_id para evitar duplicados
+        const seen = new Set();
+        actSections.value = res.data
+            .filter((e: any) => {
+                if (seen.has(e.section_id)) return false;
+                seen.add(e.section_id);
+                return true;
+            })
+            .map((e: any) => ({
+                id:      e.section_id,
+                name:    e.section_name ?? 'Sección',
+                subject: e.title,
+            }));
+    } finally {
+        loadingSections.value = false;
+    }
+};
+
+const downloadAct = () => {
+    if (!actSectionId.value || !actPeriodId.value) return;
+    const url = `/reports/subject-act?section_id=${actSectionId.value}&academic_period_id=${actPeriodId.value}`;
+    window.open(url, '_blank');
+    actDialogOpen.value = false;
+};
+
 </script>
 
 <template>
@@ -258,12 +303,6 @@ const gradeStatusVariant = (status: string): 'default' | 'secondary' | 'destruct
                             </div>
                             <div>
                                 <CardTitle class="text-2xl">{{ props.semester.name }}</CardTitle>
-                                <CardDescription class="mt-0.5">
-                                    Semestre {{ props.semester.number }}
-                                    · {{ props.semester.career.name }}
-                                    · {{ props.semester.career.faculty.name }}
-                                    · {{ props.semester.career.faculty.institution.name }}
-                                </CardDescription>
                             </div>
                         </div>
                         <div class="flex shrink-0 items-center gap-2">
@@ -273,31 +312,14 @@ const gradeStatusVariant = (status: string): 'default' | 'secondary' | 'destruct
                             <Button variant="outline" size="sm" @click="editDialogOpen = true">
                                 <Pencil class="mr-2 h-4 w-4" />Editar
                             </Button>
-                            <Button variant="destructive" size="sm" @click="deleteDialogOpen = true">
-                                <Trash2 class="mr-2 h-4 w-4" />Eliminar
+                            <Button variant="outline" size="sm" @click="actDialogOpen = true">
+                                <FileSpreadsheet class="mr-2 h-4 w-4" /> Acta por materia
                             </Button>
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent>
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        <div class="text-sm text-muted-foreground">
-                            <span class="font-medium text-foreground">Carrera:</span> {{ props.semester.career.name }}
-                        </div>
-                        <div class="text-sm text-muted-foreground">
-                            <span class="font-medium text-foreground">Facultad:</span> {{ props.semester.career.faculty.name }}
-                        </div>
-                        <div class="text-sm text-muted-foreground">
-                            <span class="font-medium text-foreground">Institución:</span> {{ props.semester.career.faculty.institution.name }}
-                        </div>
-                        <div class="text-sm text-muted-foreground">
-                            <span class="font-medium text-foreground">Número:</span> {{ props.semester.number }}
-                        </div>
-                    </div>
-                </CardContent>
             </Card>
 
-            <!-- Tabla de matrículas -->
             <Card>
                 <CardHeader>
                     <div class="flex items-center justify-between">
@@ -362,6 +384,24 @@ const gradeStatusVariant = (status: string): 'default' | 'secondary' | 'destruct
                                             @click="openGradesDialog(enrollment)"
                                         >
                                             <ClipboardList class="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            class="h-8 w-8 p-0"
+                                            title="Descargar ficha de matrícula"
+                                            @click="downloadReport(`/reports/enrollment/${enrollment.id}/card`)"
+                                        >
+                                            <FileText class="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            class="h-8 w-8 p-0"
+                                            title="Descargar boletín de calificaciones"
+                                            @click="downloadReport(`/reports/enrollment/${enrollment.id}/grades`)"
+                                        >
+                                            <FileBarChart class="h-4 w-4" />
                                         </Button>
                                         <Button
                                             variant="ghost"
@@ -620,5 +660,65 @@ const gradeStatusVariant = (status: string): 'default' | 'secondary' | 'destruct
             </DialogContent>
         </Dialog>
 
+        <!-- Dialog: Acta por materia -->
+        <Dialog v-model:open="actDialogOpen">
+            <DialogContent class="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Acta de Calificaciones</DialogTitle>
+                    <DialogDescription>
+                        Selecciona el período y la materia para generar el acta.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div class="space-y-4 py-2">
+                    <div class="space-y-1">
+                        <Label>Período académico <span class="text-destructive">*</span></Label>
+                        <Select v-model="actPeriodId" @update:model-value="loadSections">
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecciona período" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="p in props.academicPeriods"
+                                    :key="p.id"
+                                    :value="String(p.id)"
+                                >
+                                    {{ p.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div class="space-y-1">
+                        <Label>Materia / Sección <span class="text-destructive">*</span></Label>
+                        <Select v-model="actSectionId" :disabled="loadingSections || actSections.length === 0">
+                            <SelectTrigger>
+                                <SelectValue :placeholder="loadingSections ? 'Cargando...' : 'Selecciona materia'" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="s in actSections"
+                                    :key="s.id"
+                                    :value="String(s.id)"
+                                >
+                                    {{ s.subject }} — {{ s.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" @click="actDialogOpen = false">Cancelar</Button>
+                    <Button
+                        :disabled="!actSectionId || !actPeriodId"
+                        @click="downloadAct"
+                    >
+                        <FileSpreadsheet class="mr-2 h-4 w-4" />
+                        Descargar acta
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </AppLayout>
 </template>

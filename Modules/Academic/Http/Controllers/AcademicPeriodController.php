@@ -27,7 +27,7 @@ class AcademicPeriodController extends Controller
                 'name'       => $period->name,
                 'start_date' => $period->start_date?->format('Y-m-d'),
                 'end_date'   => $period->end_date?->format('Y-m-d'),
-                'is_active'  => $period->is_active,
+                'active'  => $period->active,
                 'status'     => $period->status,
                 'created_at' => $period->created_at->format('Y-m-d H:i'),
             ]);
@@ -90,7 +90,7 @@ class AcademicPeriodController extends Controller
                 'name'       => $academicPeriod->name,
                 'start_date' => $academicPeriod->start_date?->format('Y-m-d'),
                 'end_date'   => $academicPeriod->end_date?->format('Y-m-d'),
-                'is_active'  => $academicPeriod->is_active,
+                'active'  => $academicPeriod->active,
                 'status'     => $academicPeriod->status,
             ],
             'globalParameters'   => $globalParameters,
@@ -116,7 +116,7 @@ class AcademicPeriodController extends Controller
                 'name'       => $academicPeriod->name,
                 'start_date' => $academicPeriod->start_date?->format('Y-m-d'),
                 'end_date'   => $academicPeriod->end_date?->format('Y-m-d'),
-                'is_active'  => $academicPeriod->is_active,
+                'active'  => $academicPeriod->active,
                 'status'     => $academicPeriod->status,
             ],
         ]);

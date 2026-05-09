@@ -1,81 +1,66 @@
 <script setup lang="ts">
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
-import {
-    BookOpen,
-    Trophy,
-    Clock,
-    TrendingUp,
-    CheckCircle2,
-    AlertCircle,
-    Calendar,
-    FileText,
-} from 'lucide-vue-next';
+import { BookOpen, CheckCircle2, BarChart3, GraduationCap } from 'lucide-vue-next';
+import { computed } from 'vue';
+
+interface Grade  { name: string; score: number | null; pct: number; }
+interface Subject { name: string; code: string | null; credits: number; final_grade: number | null; status: string; grades: Grade[]; }
+interface Schedule { subject: string; day: string; time: string; room: string; is_today: boolean; }
+
+interface Props {
+    stats: {
+        enrolled_subjects: number;
+        approved:          number;
+        avg:               number | null;
+        semester:          string;
+    };
+    subjects:     Subject[];
+    schedule:     Schedule[];
+    activePeriod: string;
+}
+
+const props = defineProps<Props>();
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: dashboard().url },
 ];
 
-const stats = [
-    { label: 'Materias', value: '6', icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950' },
-    { label: 'Promedio General', value: '8.2', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-950' },
-    { label: 'Tareas Pendientes', value: '4', icon: FileText, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-950' },
-    { label: 'Posición en clase', value: '#7', icon: Trophy, color: 'text-violet-500', bg: 'bg-violet-50 dark:bg-violet-950' },
-];
+const statusVariant = (status: string) => ({
+    aprobado: 'default' as const,
+    reprobado: 'destructive' as const,
+    en_curso: 'secondary' as const,
+}[status] ?? 'secondary' as const);
 
-const myCourses = [
-    { name: 'Matemáticas Avanzadas', teacher: 'Prof. García', grade: 8.5, status: 'Al día', color: 'text-emerald-600' },
-    { name: 'Física General', teacher: 'Prof. Martínez', grade: 7.8, status: 'Al día', color: 'text-emerald-600' },
-    { name: 'Química Orgánica', teacher: 'Prof. López', grade: 6.4, status: 'Tarea pendiente', color: 'text-amber-600' },
-    { name: 'Inglés Técnico', teacher: 'Prof. Smith', grade: 9.1, status: 'Al día', color: 'text-emerald-600' },
-    { name: 'Programación I', teacher: 'Prof. Torres', grade: 8.9, status: 'Al día', color: 'text-emerald-600' },
-    { name: 'Estadística', teacher: 'Prof. Ruiz', grade: 7.2, status: 'Examen próximo', color: 'text-blue-600' },
-];
+const statusLabel = (status: string) => ({
+    aprobado: 'Aprobado', reprobado: 'Reprobado', en_curso: 'En curso',
+}[status] ?? status);
 
-const upcomingDeadlines = [
-    { task: 'Tarea: Química Orgánica', due: 'Hoy 23:59', urgent: true },
-    { task: 'Proyecto: Programación I', due: 'Mañana 18:00', urgent: true },
-    { task: 'Examen: Estadística', due: 'Miércoles 08:00', urgent: false },
-    { task: 'Tarea: Física General', due: 'Viernes 23:59', urgent: false },
-];
-
-const achievements = [
-    { icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-950', label: 'Top 10', desc: 'del salón' },
-    { icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-950', label: '94%', desc: 'asistencia' },
-    { icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950', label: '+0.4', desc: 'promedio' },
-];
+const statsCards = computed(() => [
+    { label: 'Materias matriculadas', value: props.stats.enrolled_subjects, icon: BookOpen,      color: 'text-blue-500',    bg: 'bg-blue-50 dark:bg-blue-950' },
+    { label: 'Aprobadas',             value: props.stats.approved,           icon: CheckCircle2,  color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-950' },
+    { label: 'Promedio actual',        value: props.stats.avg ? `${props.stats.avg}` : '—',      icon: BarChart3,     color: 'text-violet-500',  bg: 'bg-violet-50 dark:bg-violet-950' },
+    { label: 'Semestre',              value: props.stats.semester,           icon: GraduationCap, color: 'text-amber-500',   bg: 'bg-amber-50 dark:bg-amber-950' },
+]);
 </script>
 
 <template>
-    <Head title="Dashboard Estudiante" />
-
+    <Head title="Mi Dashboard" />
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-6 p-6">
 
-            <!-- Header -->
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-2xl font-bold tracking-tight">Mi Panel Estudiantil</h1>
-                    <p class="text-sm text-muted-foreground">Período 2025-I · Semana 8 de 16</p>
-                </div>
-                <div class="flex items-center gap-2 rounded-full border px-4 py-1.5">
-                    <Calendar class="h-4 w-4 text-muted-foreground" />
-                    <span class="text-sm font-medium">Lunes, 24 Feb 2025</span>
-                </div>
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">Mi Panel Académico</h1>
+                <p class="text-sm text-muted-foreground">{{ props.activePeriod }}</p>
             </div>
 
             <!-- Stats -->
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card v-for="stat in stats" :key="stat.label" class="border-0 shadow-lg dark:shadow-none dark:ring-1 dark:ring-white/10">
+                <Card v-for="stat in statsCards" :key="stat.label" class="border-0 shadow-lg dark:ring-1 dark:ring-white/10">
                     <CardContent class="p-5">
                         <div class="flex items-center justify-between">
                             <div>
@@ -90,84 +75,73 @@ const achievements = [
                 </Card>
             </div>
 
-            <!-- Middle -->
-            <div class="grid gap-4 lg:grid-cols-5">
+            <div class="grid gap-4 lg:grid-cols-3">
 
-                <!-- Courses -->
-                <Card class="lg:col-span-3 border-0 shadow-lg dark:shadow-none dark:ring-1 dark:ring-white/10">
+                <!-- Materias y notas -->
+                <Card class="lg:col-span-2 border-0 shadow-lg dark:ring-1 dark:ring-white/10">
                     <CardHeader class="pb-3">
                         <CardTitle class="text-base">Mis materias</CardTitle>
-                        <CardDescription>Calificaciones y estado actual</CardDescription>
+                        <CardDescription>Calificaciones del período actual</CardDescription>
                     </CardHeader>
-                    <CardContent class="space-y-2">
-                        <div
-                            v-for="course in myCourses"
-                            :key="course.name"
-                            class="flex items-center gap-3 rounded-xl border p-3"
-                        >
-                            <div class="flex-1 min-w-0">
-                                <p class="font-medium text-sm truncate">{{ course.name }}</p>
-                                <p class="text-xs text-muted-foreground">{{ course.teacher }}</p>
+                    <CardContent class="space-y-3">
+                        <div v-if="props.subjects.length === 0" class="text-sm text-muted-foreground text-center py-6">
+                            Sin materias matriculadas en este período.
+                        </div>
+                        <div v-for="subject in props.subjects" :key="subject.name" class="rounded-xl border p-3 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-medium text-sm">{{ subject.name }}</p>
+                                    <p class="text-xs text-muted-foreground">{{ subject.code ?? '' }} · {{ subject.credits }} créditos</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-lg">
+                                        {{ subject.final_grade ?? '—' }}
+                                        <span v-if="subject.final_grade" class="text-xs font-normal text-muted-foreground">/10</span>
+                                    </p>
+                                    <Badge :variant="statusVariant(subject.status)"
+                                           :class="subject.status === 'aprobado' ? 'bg-green-500 text-white' : ''"
+                                           class="text-xs">
+                                        {{ statusLabel(subject.status) }}
+                                    </Badge>
+                                </div>
                             </div>
-                            <div class="text-right shrink-0">
-                                <p class="text-sm font-bold">{{ course.grade }}<span class="text-xs font-normal text-muted-foreground">/10</span></p>
-                                <p :class="['text-xs font-medium', course.color]">{{ course.status }}</p>
+                            <!-- Notas parciales -->
+                            <div v-if="subject.grades.length > 0" class="flex gap-3">
+                                <div v-for="grade in subject.grades" :key="grade.name" class="text-center">
+                                    <p class="text-[10px] text-muted-foreground">{{ grade.name }}</p>
+                                    <p class="text-xs font-semibold">{{ grade.score ?? '—' }}</p>
+                                    <p class="text-[10px] text-muted-foreground">{{ grade.pct }}%</p>
+                                </div>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
 
-                <!-- Right column -->
-                <div class="lg:col-span-2 flex flex-col gap-4">
-
-                    <!-- Deadlines -->
-                    <Card class="border-0 shadow-lg dark:shadow-none dark:ring-1 dark:ring-white/10 flex-1">
-                        <CardHeader class="pb-3">
-                            <CardTitle class="text-base">Próximas entregas</CardTitle>
-                        </CardHeader>
-                        <CardContent class="space-y-2">
-                            <div
-                                v-for="item in upcomingDeadlines"
-                                :key="item.task"
-                                class="flex items-start gap-3 rounded-lg p-2.5"
-                                :class="item.urgent ? 'bg-red-50 dark:bg-red-950/40' : 'bg-muted/50'"
-                            >
-                                <component
-                                    :is="item.urgent ? AlertCircle : Clock"
-                                    class="mt-0.5 h-4 w-4 shrink-0"
-                                    :class="item.urgent ? 'text-red-500' : 'text-muted-foreground'"
-                                />
-                                <div>
-                                    <p class="text-xs font-medium">{{ item.task }}</p>
-                                    <p class="text-xs" :class="item.urgent ? 'text-red-500 font-semibold' : 'text-muted-foreground'">
-                                        {{ item.due }}
-                                    </p>
-                                </div>
+                <!-- Horario -->
+                <Card class="border-0 shadow-lg dark:ring-1 dark:ring-white/10">
+                    <CardHeader class="pb-3">
+                        <CardTitle class="text-base">Mi horario</CardTitle>
+                        <CardDescription>Clases de esta semana</CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-2">
+                        <div v-if="props.schedule.length === 0" class="text-sm text-muted-foreground text-center py-6">
+                            Sin horarios asignados.
+                        </div>
+                        <div v-for="cls in props.schedule" :key="cls.subject + cls.day + cls.time"
+                             class="rounded-lg p-3"
+                             :class="cls.is_today ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50'">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-semibold"
+                                      :class="cls.is_today ? 'text-primary' : 'text-muted-foreground'">
+                                    {{ cls.is_today ? 'Hoy' : cls.day }}
+                                </span>
+                                <span class="text-xs text-muted-foreground">{{ cls.room }}</span>
                             </div>
-                        </CardContent>
-                    </Card>
-
-                    <!-- Achievements -->
-                    <Card class="border-0 shadow-lg dark:shadow-none dark:ring-1 dark:ring-white/10">
-                        <CardHeader class="pb-3">
-                            <CardTitle class="text-base">Mis logros</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div class="grid grid-cols-3 gap-2">
-                                <div
-                                    v-for="item in achievements"
-                                    :key="item.label"
-                                    class="flex flex-col items-center gap-2 rounded-xl p-3"
-                                    :class="item.bg"
-                                >
-                                    <component :is="item.icon" :class="[item.color, 'h-5 w-5']" />
-                                    <p class="text-sm font-bold">{{ item.label }}</p>
-                                    <p class="text-xs text-muted-foreground">{{ item.desc }}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                            <p class="text-sm font-medium truncate">{{ cls.subject }}</p>
+                            <p class="text-xs text-muted-foreground">{{ cls.time }}</p>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
         </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { router } from '@inertiajs/vue3';
 import { Head } from '@inertiajs/vue3';
 import axios from 'axios';
 import {
@@ -473,6 +474,16 @@ const eventsForMonthDay = (date: Date | null) => {
                                     <div class="text-[10px] opacity-80">{{ ev.start_time }} - {{ ev.end_time }}</div>
                                     <!-- Acciones al hacer hover -->
                                     <div class="absolute right-1 top-1 hidden gap-0.5 group-hover:flex">
+                                        <button
+                                            class="rounded bg-white/20 p-0.5 hover:bg-white/40"
+                                            title="Asistencia"
+                                            @click.stop="router.visit(`/sections/${ev.section_id}/attendance`)"
+                                        >
+                                            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                                            </svg>
+                                        </button>
                                         <button
                                             class="rounded bg-white/20 p-0.5 hover:bg-blue-600/60"
                                             title="Editar"

@@ -8,7 +8,7 @@ class AcademicPeriodService
 {
     public function create(array $data): AcademicPeriod
     {
-        if ($data['is_active'] ?? false) {
+        if ($data['active'] ?? false) {
             $this->deactivateAll();
         }
 
@@ -17,7 +17,7 @@ class AcademicPeriodService
 
     public function update(AcademicPeriod $period, array $data): AcademicPeriod
     {
-        $becomingActive = ($data['is_active'] ?? false) && !$period->is_active;
+        $becomingActive = ($data['active'] ?? false) && !$period->active;
 
         if ($becomingActive) {
             $this->deactivateAll(except: $period->id);
@@ -30,7 +30,7 @@ class AcademicPeriodService
 
     public function delete(AcademicPeriod $period): void
     {
-        if ($period->is_active) {
+        if ($period->active) {
             throw new \DomainException('No se puede eliminar el período académico activo.');
         }
 
@@ -44,8 +44,8 @@ class AcademicPeriodService
     private function deactivateAll(int $except = null): void
     {
         AcademicPeriod::query()
-            ->where('is_active', true)
+            ->where('active', true)
             ->when($except, fn ($q) => $q->where('id', '!=', $except))
-            ->update(['is_active' => false]);
+            ->update(['active' => false]);
     }
 }

@@ -7,6 +7,9 @@ use Modules\Academic\Http\Controllers\EvaluationParameterController;
 use Modules\Academic\Http\Controllers\GradeController;
 use Modules\Academic\Http\Controllers\SectionController;
 use Modules\Academic\Http\Controllers\ScheduleController;
+use Modules\Academic\Http\Controllers\ReportController;
+use Modules\Academic\Http\Controllers\ActivityLogController;
+use Modules\Academic\Http\Controllers\AttendanceController;
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
@@ -51,5 +54,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/schedules',                              [ScheduleController::class, 'store'])->name('schedules.store');
     Route::put('/schedules/{schedule}',                    [ScheduleController::class, 'update'])->name('schedules.update');
     Route::delete('/schedules/{schedule}',                 [ScheduleController::class, 'destroy'])->name('schedules.destroy');
+
+    // Asistencia
+    Route::get('/sections/{section}/attendance/',          [AttendanceController::class, 'index'])->name('index');
+    Route::post('/sections/{section}/attendance/',         [AttendanceController::class, 'store'])->name('store');
+    Route::get('/sections/{section}/attendance/sheet',     [AttendanceController::class, 'sheet'])->name('sheet');
+    Route::patch('/attendances/{attendance}/justify',      [AttendanceController::class, 'justify'])->name('attendances.justify');
+
+    // Reportes
+    Route::get('reports/enrollment/{enrollment}/card',     [ReportController::class, 'enrollmentCard'])->name('enrollment-card');
+    Route::get('reports/enrollment/{enrollment}/grades',   [ReportController::class, 'gradeReport'])->name('grade-report');
+    Route::get('reports/subject-act',                      [ReportController::class, 'subjectAct'])->name('subject-act');
+    Route::get('reports/student/{student}/kardex',         [ReportController::class, 'kardex'])->name('kardex');
+
+    // Logs
+    Route::get('/activity-log',                            [ActivityLogController::class, 'index'])->name('activity-log.index');
 
 });

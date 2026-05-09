@@ -15,19 +15,22 @@ class AcademicPeriod extends Model
         'name',
         'start_date',
         'end_date',
-        'is_active',
+        'closed_at',
+        'closed_by',
         'status',
+        'active',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date'   => 'date',
-        'is_active'  => 'boolean',
+        'closed_at'  => 'datetime',
+        'active'  => 'boolean',
     ];
 
     public function scopeActive($query)
     {
-        return $query->where('is_active', true);
+        return $query->where('active', true);
     }
 
     public function scopeByStatus($query, $status)

@@ -119,6 +119,16 @@ class GradeController extends Controller
             'score.max'                        => 'La nota máxima es 10.',
         ]);
 
+        $item = EnrollmentItem::findOrFail($validated['enrollment_item_id']);
+
+        if ($item->locked) {
+            return response()->json([
+                'message' => 'Las notas están bloqueadas porque el período fue cerrado.',
+            ], 403);
+        }
+
+        $this->validatePeriodOpen($item);
+
         $grade = Grade::updateOrCreate(
             [
                 'enrollment_item_id'      => $validated['enrollment_item_id'],
@@ -134,9 +144,6 @@ class GradeController extends Controller
         $this->recalculateFinalGrade($grade->enrollmentItem);
 
         return response()->json(['success' => true]);
-
-        return redirect()->back()->with('success', 'Nota guardada exitosamente.');
-
     }
 
     public function destroy(Grade $grade)
@@ -180,4 +187,18 @@ class GradeController extends Controller
             'status'      => $status,
         ]);
     }
+
+    private function validatePeriodOpen(EnrollmentItem $item): void
+    {
+        $period = $item->enrollment->academicPeriod;
+
+        if ($period->status === 'closed') {
+            abort(403, 'No se pueden modificar notas de un período cerrado.');
+        }
+
+        if ($period->end_date && now()->gt($period->end_date)) {
+            abort(403, "El período '{$period->name}' ya finalizó. No se pueden registrar notas.");
+        }
+    }
+
 }

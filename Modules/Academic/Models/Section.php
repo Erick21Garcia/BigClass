@@ -2,12 +2,16 @@
 
 namespace Modules\Academic\Models;
 
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Section extends Model
 {
+    use LogsActivity;
+    
     protected $fillable = [
         'curricula_id', 
         'teacher_id', 
@@ -44,6 +48,13 @@ class Section extends Model
     public function enrollmentItems(): HasMany
     {
         return $this->hasMany(EnrollmentItem::class);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['curricula_id', 'teacher_id', 'academic_period_id', 'name', 'quota', 'active'])
+            ->logOnlyDirty();
     }
 
 }

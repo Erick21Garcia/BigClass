@@ -2,12 +2,16 @@
 
 namespace Modules\Academic\Models;
 
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Modules\Institucion\Models\Curriculum;
 
 class EnrollmentItem extends Model
 {
+    use LogsActivity;
+
     use HasFactory;
 
     protected $table = 'enrollment_items';
@@ -18,12 +22,14 @@ class EnrollmentItem extends Model
         'section_id',
         'status',
         'final_grade',
+        'locked',
         'active',
     ];
 
     protected $casts = [
         'final_grade' => 'decimal:2',
-        'active' => 'boolean',
+        'locked'      => 'boolean',
+        'active'      => 'boolean',
     ];
 
     public function enrollment()
@@ -56,6 +62,13 @@ class EnrollmentItem extends Model
     public function section(): BelongsTo
     {
         return $this->belongsTo(Section::class);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['status', 'final_grade', 'locked'])
+            ->logOnlyDirty();
     }
 
 }

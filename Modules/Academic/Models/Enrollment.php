@@ -2,6 +2,8 @@
 
 namespace Modules\Academic\Models;
 
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Modules\People\Models\Student;
@@ -10,6 +12,9 @@ use Modules\Institucion\Models\Semester;
 
 class Enrollment extends Model
 {
+
+    use LogsActivity;
+
     use HasFactory;
 
     protected $table = 'enrollments';
@@ -67,4 +72,12 @@ class Enrollment extends Model
     {
         return $this->status === 'active';
     }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['status', 'type', 'enrollment_date', 'academic_period_id'])
+            ->logOnlyDirty();
+    }
+    
 }

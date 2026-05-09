@@ -32,7 +32,7 @@ export interface AcademicPeriod {
     name:       string;
     start_date: string;
     end_date:   string;
-    is_active:  boolean;
+    active:  boolean;
     status:     'draft' | 'active' | 'closed';
     created_at: string;
 }
@@ -79,7 +79,7 @@ const form = useForm({
     start_date: '',
     end_date:   '',
     status:     'draft' as 'draft' | 'active' | 'closed',
-    is_active:  false,
+    active:  false,
 });
 
 const openCreateDialog = () => {
@@ -97,7 +97,7 @@ const openEditDialog = (period: AcademicPeriod) => {
     form.start_date = period.start_date;
     form.end_date   = period.end_date;
     form.status     = period.status;
-    form.is_active  = Boolean(period.is_active);
+    form.active  = Boolean(period.active);
     formDialogOpen.value = true;
 };
 
@@ -288,10 +288,10 @@ const columns: ColumnDef<AcademicPeriod>[] = [
         },
     },
     {
-        accessorKey: 'is_active',
+        accessorKey: 'active',
         header: 'Activo',
         cell: ({ row }) => {
-            const active = row.getValue('is_active') as boolean;
+            const active = row.getValue('active') as boolean;
             return h(Badge, { variant: active ? 'default' : 'secondary' }, () => active ? 'Sí' : 'No');
         },
     },
@@ -411,8 +411,8 @@ const columns: ColumnDef<AcademicPeriod>[] = [
                         </div>
 
                         <div class="flex items-center gap-3">
-                            <Checkbox id="is_active" :checked="form.is_active" @update:checked="(v: boolean) => form.is_active = v" />
-                            <Label for="is_active">Marcar como período activo</Label>
+                            <Checkbox id="active" :checked="form.active" @update:checked="(v: boolean) => form.active = v" />
+                            <Label for="active">Marcar como período activo</Label>
                         </div>
                     </form>
 
