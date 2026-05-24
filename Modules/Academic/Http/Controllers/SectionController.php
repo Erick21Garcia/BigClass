@@ -3,62 +3,43 @@
 namespace Modules\Academic\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use Modules\Academic\Http\Requests\StoreSectionRequest;
+use Modules\Academic\Http\Requests\UpdateSectionRequest;
 use Modules\Academic\Models\Section;
-use Modules\Academic\Models\AcademicPeriod;
-use Modules\Institucion\Models\Curriculum;
+use Modules\Academic\Services\SectionService;
 
 class SectionController extends Controller
 {
-    public function store(Request $request)
+    public function __construct(protected SectionService $sectionService)
     {
-        $validated = $request->validate([
-            'curricula_id'       => ['required', 'integer', 'exists:curricula,id'],
-            'teacher_id'         => ['required', 'integer', 'exists:users,id'],
-            'academic_period_id' => ['required', 'integer', 'exists:academic_periods,id'],
-            'name'               => ['required', 'string', 'max:100'],
-            'quota'              => ['required', 'integer', 'min:1', 'max:500'],
-        ], [
-            'curricula_id.required'       => 'La materia es obligatoria.',
-            'teacher_id.required'         => 'El docente es obligatorio.',
-            'academic_period_id.required' => 'El período académico es obligatorio.',
-            'name.required'               => 'El nombre de la sección es obligatorio.',
-            'quota.required'              => 'El cupo es obligatorio.',
-            'quota.min'                   => 'El cupo mínimo es 1.',
-        ]);
+    }
 
-        $section = Section::create($validated);
+    public function store(StoreSectionRequest $request)
+    {
+        $section = $this->sectionService->createSection($request->validated());
 
         return response()->json([
             'success' => true,
-            'section' => $section->load('curriculum.subject', 'teacher', 'academicPeriod'),
+            'section' => $section,
         ]);
     }
 
-    public function update(Request $request, Section $section)
+    public function update(UpdateSectionRequest $request, Section $section)
     {
-        $validated = $request->validate([
-            'curricula_id' => ['required', 'integer', 'exists:curricula,id'],
-            'name'         => ['required', 'string', 'max:100'],
-            'quota'        => ['required', 'integer', 'min:1', 'max:500'],
-            'teacher_id'   => ['required', 'integer', 'exists:teachers,id'],
-            'active'       => ['boolean'],
-        ]);
-
-        $section->update($validated);
+        $this->sectionService->updateSection($section, $request->validated());
 
         return response()->json(['success' => true]);
     }
 
     public function destroy(Section $section)
     {
-        if ($section->schedules()->exists()) {
+        $deleted = $this->sectionService->deleteSection($section);
+
+        if (! $deleted) {
             return response()->json([
                 'message' => 'No se puede eliminar una sección con horarios asignados.',
             ], 422);
         }
-
-        $section->delete();
 
         return response()->json(['success' => true]);
     }

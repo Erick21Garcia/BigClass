@@ -13,6 +13,8 @@ import institutions from '@/routes/institutions';
 import academicPeriods from '@/routes/academic-periods';
 import subjects from '@/routes/subjects';
 import schedules from '@/routes/schedules';
+import enrollments from '@/routes/enrollments';
+import activityLog from '@/routes/activity-log';
 import {
     Sidebar,
     SidebarContent,
@@ -26,20 +28,9 @@ import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
 import {
-    UserCog,
-    Settings,
-    Key,
-    Folder,
-    BookOpen,
-    LayoutGrid,
-    Users,
-    User,
-    GraduationCap,
-    School,
-    Briefcase,
-    Book,
-    BookCopy,
-    Calendar
+    UserCog, Settings, Key, Folder, BookOpen, LayoutGrid,
+    Users, User, GraduationCap, School, Briefcase, Book,
+    BookCopy, Calendar, ClipboardList, CalendarDays
 } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 import { computed } from 'vue';
@@ -129,9 +120,15 @@ const allNavItems: (NavItem & { permission?: string; role?: string[] })[] = [
     {
         title: 'Horarios',
         href: schedules.index().url,
-        icon: Calendar,
+        icon: CalendarDays,
         role: ['admin', 'super-admin'],
-    }
+    },
+    {
+        title: 'Log de Auditoría',
+        href: '/activity-log',
+        icon: ClipboardList,
+        role: ['admin', 'super-admin'],
+    },
 ];
 
 function isVisible(item: NavItem & { permission?: string; role?: string[] }): boolean {

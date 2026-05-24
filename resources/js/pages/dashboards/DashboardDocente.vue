@@ -4,7 +4,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
-import { BookOpen, ClipboardList, Users, Calendar } from 'lucide-vue-next';
+import { BookOpen, ClipboardList, Users, Calendar, AlertTriangle } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface Props {
@@ -12,9 +12,11 @@ interface Props {
         my_courses:     number;
         total_students: number;
         pending_grades: number;
+        at_risk:        number;
     };
     myCourses:       { name: string; students: number; pending: number; avg: number }[];
     upcomingClasses: { subject: string; time: string; room: string; day: string; is_today: boolean }[];
+    atRiskStudents:  { student: string; subject: string; pct: number; auto_fail: boolean }[];
     activePeriod:    string;
 }
 
@@ -29,6 +31,7 @@ const statsCards = computed(() => [
     { label: 'Mis Secciones',        value: props.stats.my_courses,     icon: BookOpen,      color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-950' },
     { label: 'Total Estudiantes',    value: props.stats.total_students,  icon: Users,         color: 'text-blue-500',    bg: 'bg-blue-50 dark:bg-blue-950' },
     { label: 'Notas por Registrar',  value: props.stats.pending_grades,  icon: ClipboardList, color: 'text-amber-500',   bg: 'bg-amber-50 dark:bg-amber-950' },
+    { label: 'En riesgo asistencia',value: props.stats.at_risk,         icon: AlertTriangle,  color: 'text-red-500',     bg: 'bg-red-50 dark:bg-red-950' },
 ]);
 </script>
 
@@ -112,8 +115,47 @@ const statsCards = computed(() => [
                         </div>
                     </CardContent>
                 </Card>
-            </div>
 
+                <Card v-if="props.atRiskStudents.length > 0" class="border-0 shadow-lg dark:ring-1 dark:ring-white/10 border-l-4 border-l-amber-500">
+                    <CardHeader class="pb-3">
+                        <CardTitle class="flex items-center gap-2 text-base">
+                            <AlertTriangle class="h-5 w-5 text-amber-500" />
+                            Estudiantes en riesgo por asistencia
+                        </CardTitle>
+                        <CardDescription>
+                            Estudiantes con más del 18% de ausencias efectivas
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="space-y-2">
+                            <div
+                                v-for="s in props.atRiskStudents"
+                                :key="s.student + s.subject"
+                                class="flex items-center justify-between rounded-lg p-3"
+                                :class="s.auto_fail
+                                    ? 'bg-red-50 dark:bg-red-950/30 border border-red-200'
+                                    : 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200'"
+                            >
+                                <div>
+                                    <p class="font-medium text-sm">{{ s.student }}</p>
+                                    <p class="text-xs text-muted-foreground">{{ s.subject }}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p
+                                        class="font-bold text-sm"
+                                        :class="s.auto_fail ? 'text-red-600' : 'text-amber-600'"
+                                    >
+                                        {{ s.pct }}% faltas
+                                    </p>
+                                    <p class="text-[10px]" :class="s.auto_fail ? 'text-red-500' : 'text-amber-500'">
+                                        {{ s.auto_fail ? 'Reprobado automático' : 'En riesgo' }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     </AppLayout>
 </template>

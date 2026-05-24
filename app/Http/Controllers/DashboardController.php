@@ -12,6 +12,7 @@ use Modules\Academic\Models\Section;
 use Modules\Academic\Models\Schedule;
 use Modules\People\Models\Student;
 use Modules\People\Models\Teacher;
+use Modules\Academic\Models\Attendance;
 
 class DashboardController extends Controller
 {
@@ -71,7 +72,7 @@ class DashboardController extends Controller
             ->values();
 
         // Conflictos de horario
-        $conflicts = \Modules\Academic\Models\Schedule::whereHas('section', fn ($q) =>
+        $conflicts = Schedule::whereHas('section', fn ($q) =>
                 $q->where('academic_period_id', $activePeriod?->id)->where('active', true)
             )
             ->where('active', true)
@@ -98,7 +99,7 @@ class DashboardController extends Controller
     public function docente(Request $request)
     {
         $user    = $request->user();
-        $teacher = \Modules\People\Models\Teacher::whereHas('person', fn ($q) =>
+        $teacher = Teacher::whereHas('person', fn ($q) =>
             $q->whereHas('user', fn ($q2) => $q2->where('id', $user->id))
         )->first();
 
@@ -106,9 +107,15 @@ class DashboardController extends Controller
 
         if (! $teacher || ! $activePeriod) {
             return Inertia::render('dashboards/DashboardDocente', [
-                'stats'           => [],
+                'stats'           => [
+                    'my_courses'     => 0,
+                    'total_students' => 0,
+                    'pending_grades' => 0,
+                    'at_risk'        => 0,
+                ],
                 'myCourses'       => [],
                 'upcomingClasses' => [],
+                'atRiskStudents'  => [],
                 'activePeriod'    => $activePeriod?->name ?? 'Sin período activo',
             ]);
         }
@@ -120,12 +127,13 @@ class DashboardController extends Controller
             ->with([
                 'curriculum.subject',
                 'schedules.classroom',
+                'enrollmentItems.enrollment.student.person',
                 'enrollmentItems.grades',
             ])
             ->get();
 
-        $totalStudents  = $sections->sum(fn ($s) => $s->enrollmentItems->count());
-        $pendingGrades  = $sections->sum(fn ($s) =>
+        $totalStudents = $sections->sum(fn ($s) => $s->enrollmentItems->count());
+        $pendingGrades = $sections->sum(fn ($s) =>
             $s->enrollmentItems->where('status', 'en_curso')->whereNull('final_grade')->count()
         );
 
@@ -137,7 +145,7 @@ class DashboardController extends Controller
             'avg'      => round($section->enrollmentItems->whereNotNull('final_grade')->avg('final_grade') ?? 0, 1),
         ])->values();
 
-        // Próximas clases (horarios de la semana)
+        // Próximas clases
         $dayNames = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
         $today    = now()->dayOfWeek;
 
@@ -155,14 +163,62 @@ class DashboardController extends Controller
         ->take(6)
         ->values();
 
+        // Estudiantes en riesgo por asistencia
+        $atRiskStudents = [];
+
+        foreach ($sections as $section) {
+            $totalClasses = Attendance::where('section_id', $section->id)
+                ->select('date')
+                ->distinct()
+                ->count();
+
+            if ($totalClasses === 0) continue;
+
+            foreach ($section->enrollmentItems as $item) {
+                if (! $item->enrollment?->student?->person) continue;
+
+                $studentId = $item->enrollment->student->id;
+
+                $absences = Attendance::where('section_id', $section->id)
+                    ->where('student_id', $studentId)
+                    ->where('status', 'absent')
+                    ->count();
+
+                $lates = Attendance::where('section_id', $section->id)
+                    ->where('student_id', $studentId)
+                    ->where('status', 'late')
+                    ->count();
+
+                $effective = $absences + ($lates * 0.5);
+                $pct       = round(($effective / $totalClasses) * 100, 1);
+
+                if ($pct >= 18) {
+                    $atRiskStudents[] = [
+                        'student'   => $item->enrollment->student->person->full_name,
+                        'subject'   => $section->curriculum->subject->name,
+                        'pct'       => $pct,
+                        'auto_fail' => $pct >= 25,
+                    ];
+                }
+            }
+        }
+
+        $atRiskStudents = collect($atRiskStudents)
+            ->sortByDesc('pct')
+            ->take(5)
+            ->values()
+            ->all();
+
         return Inertia::render('dashboards/DashboardDocente', [
             'stats' => [
                 'my_courses'     => $sections->count(),
                 'total_students' => $totalStudents,
                 'pending_grades' => $pendingGrades,
+                'at_risk'        => count($atRiskStudents),
             ],
             'myCourses'       => $myCourses,
             'upcomingClasses' => $upcomingClasses,
+            'atRiskStudents'  => $atRiskStudents,
             'activePeriod'    => $activePeriod->name,
         ]);
     }
@@ -170,7 +226,7 @@ class DashboardController extends Controller
     public function estudiante(Request $request)
     {
         $user    = $request->user();
-        $student = \Modules\People\Models\Student::whereHas('person', fn ($q) =>
+        $student = Student::whereHas('person', fn ($q) =>
             $q->whereHas('user', fn ($q2) => $q2->where('id', $user->id))
         )->first();
 
