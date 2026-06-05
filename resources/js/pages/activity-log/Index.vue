@@ -68,8 +68,11 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Log de Auditoría', href: '/activity-log' },
 ];
 
+// 'all' es el valor interno que representa "sin filtro"
+const ALL = 'all';
+
 const filters = ref({
-    subject_type: props.filters.subject_type ?? '',
+    subject_type: props.filters.subject_type ?? ALL,
     causer_id:    props.filters.causer_id    ?? '',
     date_from:    props.filters.date_from    ?? '',
     date_to:      props.filters.date_to      ?? '',
@@ -77,14 +80,17 @@ const filters = ref({
 
 const applyFilters = () => {
     router.get('/activity-log', {
+        // Convierte 'all' de vuelta a vacío para no enviarlo al servidor
         ...Object.fromEntries(
-            Object.entries(filters.value).filter(([, v]) => v !== '')
+            Object.entries(filters.value)
+                .map(([k, v]) => [k, v === ALL ? '' : v])
+                .filter(([, v]) => v !== '')
         ),
     }, { preserveScroll: true, replace: true });
 };
 
 const clearFilters = () => {
-    filters.value = { subject_type: '', causer_id: '', date_from: '', date_to: '' };
+    filters.value = { subject_type: ALL, causer_id: '', date_from: '', date_to: '' };
     router.get('/activity-log', {}, { preserveScroll: true, replace: true });
 };
 
@@ -160,7 +166,8 @@ const goToPage = (url: string | null) => {
                                     <SelectValue placeholder="Todos" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">Todos</SelectItem>
+                                    <!-- 'all' en vez de '' — SelectItem no acepta value vacío -->
+                                    <SelectItem value="all">Todos</SelectItem>
                                     <SelectItem
                                         v-for="t in subjectTypes"
                                         :key="t.value"

@@ -9,6 +9,7 @@ use Modules\Institucion\Models\Career;
 use Modules\Institucion\Models\Semester;
 use Modules\Institucion\Models\Subject;
 use Modules\Institucion\Models\Curriculum;
+use Modules\Institucion\Models\SubjectPrerequisite;
 
 class InstitutionProductionSeeder extends Seeder
 {
@@ -296,6 +297,77 @@ class InstitutionProductionSeeder extends Seeder
         }
 
         $this->command->info("✓ Currículos creados: {$curriculumCount}");
+
+        // ── 7. Prerequisitos de materias ──────────────────────────────────────
+        // Formato: 'MATERIA' => ['PREREQUISITO_1', 'PREREQUISITO_2']
+        // Significa: para cursar MATERIA hay que haber aprobado los prerequisitos.
+        $prerequisitesMap = [
+            // Matemáticas
+            'MAT102' => ['MAT101'],
+            // Física
+            'FIS101' => ['MAT101'],
+            'FIS102' => ['FIS101', 'MAT102'],
+            // Inglés
+            'ING102' => ['ING101'],
+            // Programación
+            'PRO102' => ['PRO101'],
+            'PRO201' => ['PRO102'],
+            'PRO202' => ['PRO201'],
+            // Base de Datos
+            'BD101'  => ['PRO101'],
+            'BD102'  => ['BD101'],
+            // Ingeniería de Software
+            'ING201' => ['PRO102', 'BD101'],
+            'ING202' => ['ING201'],
+            // Redes y Sistemas Operativos
+            'SO101'  => ['PRO101'],
+            'RED101' => ['FIS101'],
+            'SEG101' => ['RED101', 'SO101'],
+            // Inteligencia Artificial
+            'IA101'  => ['PRO201', 'EST101'],
+            // Electrónica
+            'ELE102' => ['ELE101'],
+            'MIC101' => ['ELE102'],
+            // Comunicaciones
+            'COM101' => ['ELE101', 'MAT102'],
+            'COM102' => ['COM101'],
+            // Administración
+            'ADM102' => ['ADM101'],
+            'MKT102' => ['MKT101'],
+            // Finanzas y Contabilidad
+            'FIN101' => ['ECO101', 'MAT101'],
+            'FIN102' => ['FIN101'],
+            'CON102' => ['CON101'],
+            'AUD101' => ['CON101', 'FIN101'],
+            'TRI101' => ['CON101'],
+            // Diseño y Publicidad
+            'DIS102' => ['DIS101'],
+            'ANI101' => ['DIS101'],
+            'PUB101' => ['DIS101'],
+        ];
+ 
+        $prereqCount = 0;
+        foreach ($prerequisitesMap as $subjectCode => $prerequisiteCodes) {
+            $subject = $subjectModels[$subjectCode] ?? null;
+            if (! $subject) continue;
+ 
+            foreach ($prerequisiteCodes as $prereqCode) {
+                $prerequisite = $subjectModels[$prereqCode] ?? null;
+                if (! $prerequisite) continue;
+ 
+                SubjectPrerequisite::firstOrCreate(
+                    [
+                        'subject_id'      => $subject->id,
+                        'prerequisite_id' => $prerequisite->id,
+                    ],
+                    ['active' => true]
+                );
+ 
+                $prereqCount++;
+            }
+        }
+
+        $this->command->info("✓ Currículos creados: {$prereqCount}");
         $this->command->info('');
         $this->command->info('═══════════════════════════════════════');
         $this->command->info('  InstitutionProductionSeeder DONE ✓  ');

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import {
-    Users, GraduationCap, School, TrendingUp,
-    AlertCircle, CheckCircle2, BookOpen, BarChart3,
+    GraduationCap, School, BookOpen, TrendingUp,
+    AlertCircle, CheckCircle2, Users, Clock,
 } from 'lucide-vue-next';
 
 interface Props {
@@ -31,75 +32,137 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const stats = computed(() => [
-    { label: 'Total Estudiantes',  value: props.stats.total_students,                      icon: GraduationCap, color: 'text-blue-500',    bg: 'bg-blue-50 dark:bg-blue-950' },
-    { label: 'Docentes Activos',   value: props.stats.total_teachers,                      icon: School,        color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-950' },
-    { label: 'Secciones Activas',  value: props.stats.active_sections,                     icon: BookOpen,      color: 'text-violet-500',  bg: 'bg-violet-50 dark:bg-violet-950' },
-    { label: 'Tasa de Aprobación', value: props.stats.approval_rate ? `${props.stats.approval_rate}%` : '—', icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-950' },
+    {
+        label: 'Estudiantes activos',
+        value: props.stats.total_students,
+        icon: GraduationCap,
+        iconClass: 'text-primary',
+        iconBg: 'bg-primary/15',
+        cardBg: 'bg-primary/5 dark:bg-primary/10 border-primary/15',
+    },
+    {
+        label: 'Docentes activos',
+        value: props.stats.total_teachers,
+        icon: School,
+        iconClass: 'text-emerald-600 dark:text-emerald-400',
+        iconBg: 'bg-emerald-100 dark:bg-emerald-950',
+        cardBg: 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-200/60 dark:border-emerald-900/60',
+    },
+    {
+        label: 'Secciones abiertas',
+        value: props.stats.active_sections,
+        icon: BookOpen,
+        iconClass: 'text-violet-600 dark:text-violet-400',
+        iconBg: 'bg-violet-100 dark:bg-violet-950',
+        cardBg: 'bg-violet-50/60 dark:bg-violet-950/30 border-violet-200/60 dark:border-violet-900/60',
+    },
+    {
+        label: 'Tasa de aprobación',
+        value: props.stats.approval_rate ? `${props.stats.approval_rate}%` : '—',
+        icon: TrendingUp,
+        iconClass: 'text-amber-600 dark:text-amber-400',
+        iconBg: 'bg-amber-100 dark:bg-amber-950',
+        cardBg: 'bg-amber-50/60 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-900/60',
+    },
 ]);
 
 const alerts = computed(() => {
     const list = [];
     if (props.stats.conflicts > 0)
-        list.push({ icon: AlertCircle, color: 'text-red-500', text: `${props.stats.conflicts} conflicto(s) de horario detectado(s)` });
+        list.push({
+            icon: AlertCircle,
+            colorClass: 'text-destructive',
+            wrapClass: 'bg-destructive/10 border border-destructive/20',
+            text: `${props.stats.conflicts} conflicto(s) de horario detectado(s)`,
+        });
     if (props.stats.pending_grades > 0)
-        list.push({ icon: AlertCircle, color: 'text-amber-500', text: `${props.stats.pending_grades} ítems sin calificación final` });
+        list.push({
+            icon: Clock,
+            colorClass: 'text-amber-600 dark:text-amber-400',
+            wrapClass: 'bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900',
+            text: `${props.stats.pending_grades} ítem(s) sin calificación final`,
+        });
     if (list.length === 0)
-        list.push({ icon: CheckCircle2, color: 'text-emerald-500', text: 'Sin alertas activas en este período' });
+        list.push({
+            icon: CheckCircle2,
+            colorClass: 'text-emerald-600 dark:text-emerald-400',
+            wrapClass: 'bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900',
+            text: 'Sin alertas activas en este período',
+        });
     return list;
 });
+
+// Color de barra según porcentaje de aprobación
+const barColor = (completion: number) => {
+    if (completion >= 80) return 'bg-emerald-500';
+    if (completion >= 60) return 'bg-amber-500';
+    return 'bg-destructive';
+};
 </script>
 
 <template>
-    <Head title="Dashboard Admin" />
+    <Head title="Dashboard" />
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-6 p-6">
 
+            <!-- Header -->
             <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold tracking-tight">Panel Administrativo</h1>
+                    <h1 class="text-2xl font-medium tracking-tight">Panel administrativo</h1>
                     <p class="text-sm text-muted-foreground">{{ props.activePeriod }}</p>
                 </div>
-                <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
-                    ● Sistema Operativo
-                </span>
+                <Badge variant="outline" class="gap-1.5 border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-400">
+                    <span class="size-1.5 rounded-full bg-emerald-500"></span>
+                    Sistema operativo
+                </Badge>
             </div>
 
-            <!-- Stats -->
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card v-for="stat in stats" :key="stat.label" class="border-0 shadow-lg dark:ring-1 dark:ring-white/10">
+            <!-- Métricas principales -->
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Card v-for="stat in stats" :key="stat.label" :class="stat.cardBg">
                     <CardContent class="p-5">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{{ stat.label }}</p>
-                                <p class="mt-1 text-3xl font-bold">{{ stat.value }}</p>
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex flex-col gap-1">
+                                <p class="text-xs font-medium text-muted-foreground">{{ stat.label }}</p>
+                                <p class="text-3xl font-medium">{{ stat.value }}</p>
                             </div>
-                            <div :class="[stat.bg, 'rounded-xl p-3']">
-                                <component :is="stat.icon" :class="[stat.color, 'h-6 w-6']" />
+                            <div :class="[stat.iconBg, 'shrink-0 rounded-lg p-2.5']">
+                                <component :is="stat.icon" :class="[stat.iconClass, 'size-5']" />
                             </div>
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
-            <!-- Middle -->
+            <!-- Materias + Alertas -->
             <div class="grid gap-4 lg:grid-cols-3">
-                <Card class="lg:col-span-2 border-0 shadow-lg dark:ring-1 dark:ring-white/10">
+
+                <Card class="lg:col-span-2">
                     <CardHeader class="pb-3">
-                        <CardTitle class="text-base">Materias con más inscripciones</CardTitle>
-                        <CardDescription>Tasa de aprobación por materia</CardDescription>
+                        <CardTitle class="text-base font-medium">Materias con más inscripciones</CardTitle>
+                        <CardDescription>Tasa de aprobación por materia en el período actual</CardDescription>
                     </CardHeader>
                     <CardContent class="space-y-4">
-                        <div v-if="props.topSubjects.length === 0" class="text-sm text-muted-foreground text-center py-6">
+                        <div
+                            v-if="props.topSubjects.length === 0"
+                            class="py-8 text-center text-sm text-muted-foreground"
+                        >
                             Sin datos para el período actual.
                         </div>
-                        <div v-for="subject in props.topSubjects" :key="subject.name" class="space-y-1.5">
+                        <div
+                            v-for="subject in props.topSubjects"
+                            :key="subject.name"
+                            class="space-y-1.5"
+                        >
                             <div class="flex items-center justify-between text-sm">
                                 <span class="font-medium">{{ subject.name }}</span>
-                                <span class="text-muted-foreground">{{ subject.students }} est. · {{ subject.completion }}%</span>
+                                <span class="text-muted-foreground tabular-nums">
+                                    {{ subject.students }} est. · {{ subject.completion }}%
+                                </span>
                             </div>
-                            <div class="h-2 w-full rounded-full bg-muted">
+                            <div class="h-1.5 w-full rounded-full bg-muted">
                                 <div
-                                    class="h-2 rounded-full bg-gradient-to-r from-violet-500 to-blue-500 transition-all duration-700"
+                                    :class="[barColor(subject.completion), 'h-1.5 rounded-full transition-all duration-500']"
                                     :style="{ width: subject.completion + '%' }"
                                 />
                             </div>
@@ -107,45 +170,64 @@ const alerts = computed(() => {
                     </CardContent>
                 </Card>
 
-                <Card class="border-0 shadow-lg dark:ring-1 dark:ring-white/10">
+                <Card>
                     <CardHeader class="pb-3">
-                        <CardTitle class="text-base">Alertas del sistema</CardTitle>
+                        <CardTitle class="text-base font-medium">Alertas del sistema</CardTitle>
+                        <CardDescription>Estado del período académico actual</CardDescription>
                     </CardHeader>
-                    <CardContent class="space-y-3">
-                        <div v-for="alert in alerts" :key="alert.text" class="flex items-start gap-3 rounded-lg bg-muted/50 p-3">
-                            <component :is="alert.icon" :class="[alert.color, 'mt-0.5 h-4 w-4 shrink-0']" />
+                    <CardContent class="space-y-2">
+                        <div
+                            v-for="alert in alerts"
+                            :key="alert.text"
+                            :class="[alert.wrapClass, 'flex items-start gap-3 rounded-lg p-3']"
+                        >
+                            <component :is="alert.icon" :class="[alert.colorClass, 'mt-0.5 size-4 shrink-0']" />
                             <p class="text-xs leading-relaxed text-muted-foreground">{{ alert.text }}</p>
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
-            <!-- Bottom -->
-            <div class="grid gap-4 md:grid-cols-3">
-                <Card class="border-0 shadow-lg dark:ring-1 dark:ring-white/10 bg-gradient-to-br from-violet-600 to-blue-600 text-white">
+            <!-- Resumen inferior -->
+            <div class="grid gap-4 sm:grid-cols-3">
+
+                <Card class="border-primary/20 bg-primary/5 dark:bg-primary/10">
                     <CardContent class="p-5">
-                        <Users class="h-8 w-8 opacity-80 mb-3" />
-                        <p class="text-3xl font-bold">{{ props.stats.total_students + props.stats.total_teachers }}</p>
-                        <p class="text-sm opacity-80 mt-1">Usuarios en el sistema</p>
+                        <div class="mb-3 flex size-9 items-center justify-center rounded-lg bg-primary/10">
+                            <Users class="size-5 text-primary" />
+                        </div>
+                        <p class="text-3xl font-medium">
+                            {{ props.stats.total_students + props.stats.total_teachers }}
+                        </p>
+                        <p class="mt-1 text-sm text-muted-foreground">Usuarios en el sistema</p>
                     </CardContent>
                 </Card>
-                <Card class="border-0 shadow-lg dark:ring-1 dark:ring-white/10">
+
+                <Card>
                     <CardContent class="p-5">
-                        <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Evaluaciones pendientes</p>
-                        <p class="mt-1 text-3xl font-bold">{{ props.stats.pending_grades }}</p>
-                        <p class="mt-1 text-xs text-amber-600 font-medium">ítems sin nota final</p>
+                        <div class="mb-3 flex size-9 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950/50">
+                            <Clock class="size-5 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <p class="text-3xl font-medium">{{ props.stats.pending_grades }}</p>
+                        <p class="mt-1 text-sm text-muted-foreground">Evaluaciones pendientes</p>
+                        <p class="mt-0.5 text-xs text-amber-600 dark:text-amber-400">ítems sin nota final</p>
                     </CardContent>
                 </Card>
-                <Card class="border-0 shadow-lg dark:ring-1 dark:ring-white/10">
+
+                <Card>
                     <CardContent class="p-5">
-                        <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Promedio general</p>
-                        <p class="mt-1 text-3xl font-bold">
+                        <div class="mb-3 flex size-9 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/50">
+                            <TrendingUp class="size-5 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <p class="text-3xl font-medium">
                             {{ props.stats.general_avg ?? '—' }}
                             <span v-if="props.stats.general_avg" class="text-base font-normal text-muted-foreground">/ 10</span>
                         </p>
-                        <p class="mt-1 text-xs text-emerald-600 font-medium">período actual</p>
+                        <p class="mt-1 text-sm text-muted-foreground">Promedio general</p>
+                        <p class="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">período actual</p>
                     </CardContent>
                 </Card>
+
             </div>
 
         </div>

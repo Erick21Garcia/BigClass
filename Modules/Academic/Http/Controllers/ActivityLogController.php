@@ -11,21 +11,29 @@ class ActivityLogController extends Controller
 {
     public function index(Request $request)
     {
+        $filters = $request->only(['subject_type', 'causer_id', 'date_from', 'date_to']);
+
         $logs = Activity::with('causer')
-            ->when($request->filled('subject_type'), fn ($q) =>
-                $q->where('subject_type', 'like', '%' . $request->subject_type . '%')
+            ->when(
+                filled($filters['subject_type'] ?? null),
+                // Busca por el nombre corto de la clase dentro del namespace completo
+                fn ($q) => $q->where('subject_type', 'like', '%\\' . $filters['subject_type'])
             )
-            ->when($request->filled('causer_id'), fn ($q) =>
-                $q->where('causer_id', $request->causer_id)
+            ->when(
+                filled($filters['causer_id'] ?? null),
+                fn ($q) => $q->where('causer_id', $filters['causer_id'])
             )
-            ->when($request->filled('date_from'), fn ($q) =>
-                $q->whereDate('created_at', '>=', $request->date_from)
+            ->when(
+                filled($filters['date_from'] ?? null),
+                fn ($q) => $q->whereDate('created_at', '>=', $filters['date_from'])
             )
-            ->when($request->filled('date_to'), fn ($q) =>
-                $q->whereDate('created_at', '<=', $request->date_to)
+            ->when(
+                filled($filters['date_to'] ?? null),
+                fn ($q) => $q->whereDate('created_at', '<=', $filters['date_to'])
             )
             ->orderByDesc('created_at')
             ->paginate(50)
+            ->appends($filters)   // ← preserva los filtros en los links de paginación
             ->through(fn ($log) => [
                 'id'           => $log->id,
                 'description'  => $log->description,
@@ -36,7 +44,7 @@ class ActivityLogController extends Controller
                     'name' => $log->causer->name,
                 ] : null,
                 'properties' => [
-                    'old' => $log->properties['old'] ?? null,
+                    'old'        => $log->properties['old'] ?? null,
                     'attributes' => $log->properties['attributes'] ?? null,
                 ],
                 'created_at' => $log->created_at->format('d/m/Y H:i:s'),
@@ -44,7 +52,7 @@ class ActivityLogController extends Controller
 
         return Inertia::render('activity-log/Index', [
             'logs'    => $logs,
-            'filters' => $request->only(['subject_type', 'causer_id', 'date_from', 'date_to']),
+            'filters' => $filters,
         ]);
     }
 }

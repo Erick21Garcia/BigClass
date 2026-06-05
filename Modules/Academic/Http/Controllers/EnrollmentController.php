@@ -4,6 +4,9 @@ namespace Modules\Academic\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
+use Modules\Academic\Exports\BulkEnrollmentTemplateExport;
+use Modules\Academic\Http\Requests\BulkEnrollmentRequest;
 use Modules\Academic\Http\Requests\StoreEnrollmentRequest;
 use Modules\Academic\Http\Requests\UpdateEnrollmentRequest;
 use Modules\Academic\Models\AcademicPeriod;
@@ -18,6 +21,10 @@ class EnrollmentController extends Controller
         private EnrollmentService $enrollmentService
     ) {}
 
+    // =========================================================================
+    // CRUD individual (sin cambios)
+    // =========================================================================
+
     public function index()
     {
         $enrollments = Enrollment::query()
@@ -29,7 +36,7 @@ class EnrollmentController extends Controller
                 'enrollment_date' => $enrollment->enrollment_date?->format('Y-m-d'),
                 'type'            => $enrollment->type,
                 'status'          => $enrollment->status,
-                'active'       => $enrollment->active,
+                'active'          => $enrollment->active,
                 'student'         => [
                     'id'        => $enrollment->student->id,
                     'full_name' => $enrollment->student->person->full_name,
@@ -84,10 +91,11 @@ class EnrollmentController extends Controller
 
         return Inertia::render('enrollments/Create', [
             'semester' => [
-                'id'     => $semester->id,
-                'name'   => $semester->name,
-                'number' => $semester->number,
-                'career' => [
+                'id'       => $semester->id,
+                'name'     => $semester->name,
+                'number'   => $semester->number,
+                'career_id' => $semester->career_id,
+                'career'   => [
                     'id'   => $semester->career->id,
                     'name' => $semester->career->name,
                     'faculty' => [
@@ -117,7 +125,7 @@ class EnrollmentController extends Controller
                 'enrollment_date' => $enrollment->enrollment_date?->format('Y-m-d'),
                 'type'            => $enrollment->type,
                 'status'          => $enrollment->status,
-                'active'       => $enrollment->active,
+                'active'          => $enrollment->active,
                 'student'         => [
                     'id'        => $enrollment->student->id,
                     'full_name' => $enrollment->student->person->full_name,
@@ -222,7 +230,6 @@ class EnrollmentController extends Controller
         $academicPeriodId = $enrollment->academic_period_id;
 
         $items = $enrollment->items->where('active', true)->map(function ($item) use ($academicPeriodId) {
-
             $parameters = \Modules\Academic\Models\EvaluationParameter::where('academic_period_id', $academicPeriodId)
                 ->where('curriculum_id', $item->curricula_id)
                 ->where('active', true)
@@ -235,14 +242,14 @@ class EnrollmentController extends Controller
                     ->get();
             }
 
-            $parameters = $parameters->sortBy('created_at')->values();
+            $parameters    = $parameters->sortBy('created_at')->values();
             $gradesByParam = $item->grades->keyBy('evaluation_parameter_id');
 
             return [
                 'enrollment_item_id' => $item->id,
                 'status'             => $item->status,
                 'final_grade'        => $item->final_grade,
-                'subject' => [
+                'subject'            => [
                     'id'   => $item->curriculum->subject->id,
                     'name' => $item->curriculum->subject->name,
                     'code' => $item->curriculum->subject->code,
@@ -266,6 +273,79 @@ class EnrollmentController extends Controller
             'student'         => $enrollment->student->person->full_name ?? '',
             'academic_period' => $enrollment->academicPeriod->name,
             'items'           => $items,
+        ]);
+    }
+
+    // =========================================================================
+    // Matrícula masiva
+    // =========================================================================
+
+    /**
+     * Descarga la plantilla Excel para matrícula masiva.
+     */
+    public function bulkTemplate()
+    {
+        return Excel::download(
+            new BulkEnrollmentTemplateExport(),
+            'plantilla-matricula-masiva.xlsx',
+        );
+    }
+
+    /**
+     * Recibe el Excel y devuelve la previsualización (sin guardar nada).
+     * El frontend muestra la tabla y el usuario confirma.
+     */
+    public function bulkPreview(BulkEnrollmentRequest $request)
+    {
+        $semester = Semester::findOrFail($request->integer('semester_id'));
+
+        $preview = $this->enrollmentService->bulkPreview(
+            file:             $request->file('file'),
+            semesterId:       $semester->id,
+            careerId:         $semester->career_id,
+            academicPeriodId: $request->integer('academic_period_id'),
+        );
+
+        return response()->json([
+            'preview'        => $preview,
+            'total'          => count($preview),
+            'can_enroll'     => collect($preview)->where('can_enroll', true)->count(),
+            'will_skip'      => collect($preview)->where('can_enroll', false)->count(),
+        ]);
+    }
+
+    /**
+     * Recibe la previsualización confirmada y ejecuta las matrículas.
+     */
+    public function bulkStore(BulkEnrollmentRequest $request)
+    {
+        $semester = Semester::findOrFail($request->integer('semester_id'));
+
+        // Re-genera el preview desde el archivo para no confiar en datos del cliente
+        $preview = $this->enrollmentService->bulkPreview(
+            file:             $request->file('file'),
+            semesterId:       $semester->id,
+            careerId:         $semester->career_id,
+            academicPeriodId: $request->integer('academic_period_id'),
+        );
+
+        $report = $this->enrollmentService->bulkCreate(
+            rows:       $preview,
+            sharedData: [
+                'semester_id'        => $semester->id,
+                'academic_period_id' => $request->integer('academic_period_id'),
+                'type'               => $request->input('type'),
+                'status'             => $request->input('status'),
+                'enrollment_date'    => $request->input('enrollment_date'),
+            ],
+        );
+
+        return response()->json([
+            'success'        => true,
+            'enrolled_count' => $report['enrolled_count'],
+            'skipped_count'  => $report['skipped_count'],
+            'enrolled'       => $report['enrolled'],
+            'skipped'        => $report['skipped'],
         ]);
     }
 }

@@ -2,25 +2,22 @@
 
 namespace Modules\Academic\Services;
 
+use Illuminate\Support\Collection;
+use Modules\Academic\Imports\BulkEnrollmentImport;
 use Modules\Academic\Models\Enrollment;
 use Modules\Academic\Models\EnrollmentItem;
 use Modules\Institucion\Models\Curriculum;
+use Modules\People\Models\Student;
+use Maatwebsite\Excel\Facades\Excel;
 
 class EnrollmentService
 {
+    // =========================================================================
+    // Matrícula individual (sin cambios)
+    // =========================================================================
+
     /**
      * Crea la matrícula y sus items, validando prerequisitos por cada materia.
-     *
-     * @param  array{
-     *   student_id: int,
-     *   career_id: int,
-     *   semester_id: int,
-     *   academic_period_id: int,
-     *   enrollment_date: string,
-     *   type: string,
-     *   status: string,
-     *   curricula_ids: int[],
-     * } $data
      */
     public function create(array $data): Enrollment
     {
@@ -52,7 +49,6 @@ class EnrollmentService
 
     /**
      * Actualiza solo los campos de cabecera de la matrícula.
-     * Los items se manejan por separado con syncItems().
      */
     public function update(Enrollment $enrollment, array $data): Enrollment
     {
@@ -75,20 +71,165 @@ class EnrollmentService
         $enrollment->delete();
     }
 
+    // =========================================================================
+    // Matrícula masiva
+    // =========================================================================
+
     /**
-     * Devuelve las materias que el estudiante puede matricular en un semestre,
-     * agrupadas en dos bloques:
-     *   - current:  materias del semestre indicado
-     *   - carryover: materias de semestres anteriores que reprobó o no cursó
+     * Lee el Excel y devuelve una previsualización fila por fila.
      *
-     * Cada materia incluye:
-     *   - can_enroll:      bool  — si cumple todos los prerequisitos
-     *   - missing:         array — prerequisitos que le faltan aprobar
-     *   - already_enrolled bool  — si ya está cursando esta materia actualmente
+     * Cada entrada del array resultado tiene:
+     *   cedula, student_name, codigos_materias, curricula_ids,
+     *   can_enroll (bool), errors (string[])
+     *
+     * @param  \Illuminate\Http\UploadedFile $file
+     * @param  int  $semesterId
+     * @param  int  $careerId       — se pasa desde el controller (viene del semester)
+     * @param  int  $academicPeriodId
      */
+    public function bulkPreview($file, int $semesterId, int $careerId, int $academicPeriodId): array
+    {
+        $import = new BulkEnrollmentImport();
+        Excel::import($import, $file);
+
+        $rows = $import->getRows();
+
+        // Pre-cargar todos los curricula del semestre/carrera para búsqueda por código
+        $curriculaByCode = Curriculum::where('career_id', $careerId)
+            ->where('active', true)
+            ->with('subject')
+            ->get()
+            ->keyBy('subject.code');
+
+        // Estudiantes ya matriculados en este semestre/carrera/período
+        $alreadyEnrolledStudentIds = Enrollment::where('semester_id', $semesterId)
+            ->where('career_id', $careerId)
+            ->where('academic_period_id', $academicPeriodId)
+            ->whereIn('status', ['active', 'registered'])
+            ->pluck('student_id')
+            ->flip();
+
+        return $rows->map(function ($row) use ($curriculaByCode, $alreadyEnrolledStudentIds, $semesterId, $careerId) {
+            $errors     = [];
+            $curriculaIds = [];
+            $studentName  = null;
+
+            // 1. Buscar estudiante por cédula
+            $student = Student::whereHas('person', fn ($q) =>
+                $q->where('identification', $row['cedula'])
+            )->with('person')->first();
+
+            if (! $student) {
+                $errors[] = 'Estudiante no encontrado con esa cédula.';
+            } else {
+                $studentName = $student->person->full_name;
+
+                // 2. Verificar que no esté ya matriculado
+                if (isset($alreadyEnrolledStudentIds[$student->id])) {
+                    $errors[] = 'Ya tiene una matrícula activa en este semestre y período.';
+                }
+
+                // 3. Resolver códigos de materias → curriculum IDs
+                $notFound = [];
+                foreach ($row['codigos_materias'] as $code) {
+                    $curriculum = $curriculaByCode->get($code);
+                    if (! $curriculum) {
+                        $notFound[] = $code;
+                    } else {
+                        $curriculaIds[] = $curriculum->id;
+                    }
+                }
+
+                if (! empty($notFound)) {
+                    $errors[] = 'Materias no encontradas: ' . implode(', ', $notFound);
+                }
+
+                // 4. Validar prerequisitos (solo si no hay otros errores)
+                if (empty($errors) && ! empty($curriculaIds)) {
+                    try {
+                        $this->validatePrerequisites($student->id, $curriculaIds);
+                    } catch (\DomainException $e) {
+                        $errors[] = $e->getMessage();
+                    }
+                }
+            }
+
+            return [
+                'cedula'           => $row['cedula'],
+                'student_name'     => $studentName,
+                'student_id'       => $student?->id,
+                'career_id'        => $careerId,
+                'codigos_materias' => $row['codigos_materias'],
+                'curricula_ids'    => $curriculaIds,
+                'can_enroll'       => empty($errors),
+                'errors'           => $errors,
+            ];
+        })->values()->all();
+    }
+
+    /**
+     * Procesa la matrícula masiva a partir de la previsualización ya confirmada.
+     *
+     * Recibe el array de filas validadas (solo las que can_enroll = true se procesan).
+     * Devuelve un reporte con éxitos y omitidos.
+     *
+     * @param  array $rows            — filas parseadas del preview
+     * @param  array $sharedData      — academic_period_id, semester_id, type, status, enrollment_date
+     */
+    public function bulkCreate(array $rows, array $sharedData): array
+    {
+        $enrolled = [];
+        $skipped  = [];
+
+        foreach ($rows as $row) {
+            if (! $row['can_enroll']) {
+                $skipped[] = [
+                    'cedula'       => $row['cedula'],
+                    'student_name' => $row['student_name'] ?? 'Desconocido',
+                    'errors'       => $row['errors'],
+                ];
+                continue;
+            }
+
+            try {
+                $this->create([
+                    'student_id'         => $row['student_id'],
+                    'career_id'          => $row['career_id'],
+                    'semester_id'        => $sharedData['semester_id'],
+                    'academic_period_id' => $sharedData['academic_period_id'],
+                    'enrollment_date'    => $sharedData['enrollment_date'],
+                    'type'               => $sharedData['type'],
+                    'status'             => $sharedData['status'],
+                    'curricula_ids'      => $row['curricula_ids'],
+                ]);
+
+                $enrolled[] = [
+                    'cedula'       => $row['cedula'],
+                    'student_name' => $row['student_name'],
+                ];
+            } catch (\DomainException $e) {
+                $skipped[] = [
+                    'cedula'       => $row['cedula'],
+                    'student_name' => $row['student_name'] ?? 'Desconocido',
+                    'errors'       => [$e->getMessage()],
+                ];
+            }
+        }
+
+        return [
+            'enrolled_count' => count($enrolled),
+            'skipped_count'  => count($skipped),
+            'enrolled'       => $enrolled,
+            'skipped'        => $skipped,
+        ];
+    }
+
+    // =========================================================================
+    // Materias disponibles para un estudiante
+    // =========================================================================
+
     public function getAvailableSubjects(int $studentId, int $careerId, int $semesterId): array
     {
-        // Todas las materias aprobadas por el estudiante (subject_id[])
         $approvedSubjectIds = EnrollmentItem::whereHas('enrollment', fn ($q) =>
                 $q->where('student_id', $studentId)
             )
@@ -101,7 +242,6 @@ class EnrollmentService
             ->values()
             ->all();
 
-        // Materias que el estudiante tiene actualmente en curso
         $inProgressCurriculaIds = EnrollmentItem::whereHas('enrollment', fn ($q) =>
                 $q->where('student_id', $studentId)
                   ->whereIn('status', ['active', 'registered'])
@@ -110,15 +250,12 @@ class EnrollmentService
             ->pluck('curricula_id')
             ->all();
 
-        // Materias del semestre actual en la carrera
         $currentCurricula = Curriculum::where('career_id', $careerId)
             ->where('semester_id', $semesterId)
             ->where('active', true)
             ->with('subject.prerequisiteSubjects')
             ->get();
 
-        // Materias de semestres anteriores que el estudiante nunca aprobó
-        // y tampoco está cursando actualmente (arrastre)
         $carryoverCurricula = Curriculum::where('career_id', $careerId)
             ->where('semester_id', '!=', $semesterId)
             ->where('active', true)
@@ -140,16 +277,10 @@ class EnrollmentService
         ];
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Privados
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
-    /**
-     * Valida que el estudiante haya aprobado todos los prerequisitos
-     * de cada materia que quiere matricular.
-     *
-     * @throws \DomainException con el detalle de qué falta
-     */
     private function validatePrerequisites(int $studentId, array $curriculaIds): void
     {
         $approvedSubjectIds = EnrollmentItem::whereHas('enrollment', fn ($q) =>
@@ -182,9 +313,6 @@ class EnrollmentService
         }
     }
 
-    /**
-     * Mapea una colección de Curriculum al formato que consume el frontend.
-     */
     private function mapCurricula(
         \Illuminate\Support\Collection $curricula,
         array $approvedSubjectIds,
@@ -197,24 +325,24 @@ class EnrollmentService
                 ->values();
 
             return [
-                'curriculum_id'    => $curriculum->id,
-                'subject_id'       => $curriculum->subject->id,
-                'subject_name'     => $curriculum->subject->name,
-                'subject_code'     => $curriculum->subject->code,
-                'credits'          => $curriculum->subject->credits,
-                'is_mandatory'     => $curriculum->is_mandatory,
-                'semester'         => isset($curriculum->semester) ? [
+                'curriculum_id'         => $curriculum->id,
+                'subject_id'            => $curriculum->subject->id,
+                'subject_name'          => $curriculum->subject->name,
+                'subject_code'          => $curriculum->subject->code,
+                'credits'               => $curriculum->subject->credits,
+                'is_mandatory'          => $curriculum->is_mandatory,
+                'semester'              => isset($curriculum->semester) ? [
                     'id'     => $curriculum->semester->id,
                     'name'   => $curriculum->semester->name,
                     'number' => $curriculum->semester->number,
                 ] : null,
-                'can_enroll'       => $missing->isEmpty(),
+                'can_enroll'            => $missing->isEmpty(),
                 'missing_prerequisites' => $missing->map(fn ($s) => [
                     'id'   => $s->id,
                     'name' => $s->name,
                     'code' => $s->code,
                 ])->values()->all(),
-                'already_enrolled' => in_array($curriculum->id, $inProgressCurriculaIds),
+                'already_enrolled'      => in_array($curriculum->id, $inProgressCurriculaIds),
             ];
         })->values()->all();
     }
