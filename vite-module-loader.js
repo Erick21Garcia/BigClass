@@ -36,7 +36,7 @@ async function collectModuleAssetsPaths(paths, modulesPath) {
           if (moduleConfig.paths && Array.isArray(moduleConfig.paths)) {
             paths.push(...moduleConfig.paths);
           }
-        } catch (error) {
+        } catch {
           // vite.config.js does not exist, skip this module
         }
       }

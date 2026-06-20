@@ -48,7 +48,7 @@ interface Props {
     academicPeriods: AcademicPeriod[];
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Administración',      href: dashboard().url },

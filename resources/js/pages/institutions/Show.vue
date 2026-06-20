@@ -178,12 +178,6 @@ const goToFaculty = (id: number) => {
                                         ({{ props.institution.acronym }})
                                     </span>
                                 </CardTitle>
-                                <CardDescription class="mt-0.5 capitalize">
-                                    {{ getTypeLabel(props.institution.type) }}
-                                    <span v-if="props.institution.code" class="ml-2 font-mono">
-                                        · {{ props.institution.code }}
-                                    </span>
-                                </CardDescription>
                             </div>
                         </div>
 

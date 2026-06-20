@@ -163,12 +163,6 @@ const goToCareer = (id: number) => {
                                 <CardTitle class="text-2xl">
                                     {{ props.faculty.name }}
                                 </CardTitle>
-                                <CardDescription class="mt-0.5">
-                                    {{ props.faculty.institution.name }}
-                                    <span v-if="props.faculty.code" class="ml-2 font-mono">
-                                        · {{ props.faculty.code }}
-                                    </span>
-                                </CardDescription>
                             </div>
                         </div>
 

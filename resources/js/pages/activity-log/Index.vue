@@ -293,8 +293,9 @@ const goToPage = (url: string | null) => {
                         :disabled="!link.url"
                         class="min-w-8 text-xs"
                         @click="goToPage(link.url)"
-                        v-html="link.label"
-                    />
+                    >
+                        <span v-html="link.label" />
+                    </Button>
                 </div>
             </div>
 

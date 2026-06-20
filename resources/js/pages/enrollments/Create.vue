@@ -125,9 +125,16 @@ const selectedSet = computed(() => new Set(form.curricula_ids));
 
 const toggleSubject = (subject: SubjectItem) => {
     if (!subject.can_enroll || subject.already_enrolled) return;
+
     const ids = [...form.curricula_ids];
     const idx = ids.indexOf(subject.curriculum_id);
-    idx === -1 ? ids.push(subject.curriculum_id) : ids.splice(idx, 1);
+
+    if (idx === -1) {
+        ids.push(subject.curriculum_id);
+    } else {
+        ids.splice(idx, 1);
+    }
+
     form.curricula_ids = ids;
 };
 

@@ -43,7 +43,7 @@ interface Props {
     permissions: Permission[];
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
 const breadcrumbs: BreadcrumbItem[] = [
     {

@@ -142,12 +142,6 @@ const sortedSemesters = () =>
                             </div>
                             <div>
                                 <CardTitle class="text-2xl">{{ props.career.name }}</CardTitle>
-                                <CardDescription class="mt-0.5">
-                                    {{ props.career.faculty.name }} · {{ props.career.faculty.institution.name }}
-                                    <span v-if="props.career.code" class="ml-2 font-mono">
-                                        · {{ props.career.code }}
-                                    </span>
-                                </CardDescription>
                             </div>
                         </div>
 
