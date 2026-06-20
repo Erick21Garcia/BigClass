@@ -3,14 +3,15 @@ import AppLogoIcon from '@/components/AppLogoIcon.vue';
 </script>
 
 <template>
-    <div
-        class="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"
-    >
-        <AppLogoIcon class="size-5 fill-current text-white dark:text-black" />
-    </div>
-    <div class="ml-1 grid flex-1 text-left text-sm">
-        <span class="mb-0.5 truncate leading-tight font-semibold"
-            >Acadex</span
-        >
+    <div class="flex items-center gap-3">
+        <img src="/favicon.svg" alt="Acadex" class="size-8" />
+        <div class="flex flex-col leading-none">
+            <span class="text-lg font-medium tracking-wide text-sidebar-foreground">
+                Acadex
+            </span>
+            <span class="text-[10px] tracking-widest text-sidebar-foreground/50 uppercase">
+                Sistema Académico
+            </span>
+        </div>
     </div>
 </template>

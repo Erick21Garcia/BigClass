@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -411,8 +411,8 @@ const columns: ColumnDef<AcademicPeriod>[] = [
                         </div>
 
                         <div class="flex items-center gap-3">
-                            <Checkbox id="active" :checked="form.active" @update:checked="(v: boolean) => form.active = v" />
-                            <Label for="active">Marcar como período activo</Label>
+                            <Switch v-model="form.active" />
+                            <Label>Marcar como período activo</Label>
                         </div>
                     </form>
 

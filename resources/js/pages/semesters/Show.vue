@@ -9,7 +9,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import {
     Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -442,8 +442,8 @@ const downloadAct = () => {
                             <p v-if="editForm.errors.name" class="text-xs text-destructive">{{ editForm.errors.name }}</p>
                         </div>
                         <div class="col-span-2 flex items-center gap-3">
-                            <Checkbox id="edit-active" :checked="editForm.active" @update:checked="(v: boolean) => editForm.active = v" />
-                            <Label for="edit-active">Semestre activo</Label>
+                            <Switch v-model="editForm.active" />
+                            <Label>Semestre activo</Label>
                         </div>
                     </div>
                     <DialogFooter>

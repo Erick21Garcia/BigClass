@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem,
     DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -350,8 +350,8 @@ const columns: ColumnDef<Subject>[] = [
                             <p v-if="form.errors.description" class="text-xs text-destructive">{{ form.errors.description }}</p>
                         </div>
                         <div class="col-span-2 flex items-center gap-3">
-                            <Checkbox id="f-active" :checked="form.active" @update:checked="(v: boolean) => form.active = v" />
-                            <Label for="f-active">Materia activa</Label>
+                            <Switch v-model="form.active" />
+                            <Label>Materia activa</Label>
                         </div>
                     </div>
                 </form>

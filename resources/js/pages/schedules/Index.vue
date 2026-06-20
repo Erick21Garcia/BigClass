@@ -755,7 +755,7 @@ const eventsForMonthDay = (date: Date | null) => {
 
                     <!-- Recurrente -->
                     <div class="col-span-2 flex items-center gap-3">
-                        <Switch v-model:checked="form.is_recurring" />
+                        <Switch v-model="form.is_recurring" />
                         <Label>Horario recurrente (se repite cada semana)</Label>
                     </div>
 

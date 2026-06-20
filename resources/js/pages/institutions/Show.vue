@@ -10,7 +10,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import {
     Card,
@@ -374,12 +374,8 @@ const goToFaculty = (id: number) => {
                         </div>
 
                         <div class="col-span-2 flex items-center gap-3">
-                            <Checkbox
-                                id="edit-active"
-                                :checked="editForm.active"
-                                @update:checked="(v: boolean) => editForm.active = v"
-                            />
-                            <Label for="edit-active">Institución activa</Label>
+                            <Switch v-model="editForm.active" />
+                            <Label>Institución activa</Label>
                         </div>
 
                     </div>
@@ -450,12 +446,8 @@ const goToFaculty = (id: number) => {
                         </div>
 
                         <div class="col-span-2 flex items-center gap-3">
-                            <Checkbox
-                                id="f-active"
-                                :checked="facultyForm.active"
-                                @update:checked="(v: boolean) => facultyForm.active = v"
-                            />
-                            <Label for="f-active">Facultad activa</Label>
+                            <Switch v-model="facultyForm.active" />
+                            <Label>Facultad activa</Label>
                         </div>
 
                     </div>
