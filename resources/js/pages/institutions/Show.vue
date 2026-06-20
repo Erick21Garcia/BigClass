@@ -81,9 +81,6 @@ const INSTITUTION_TYPES = [
     { value: 'other',      label: 'Otro'        },
 ];
 
-const getTypeLabel = (value: string) =>
-    INSTITUTION_TYPES.find(t => t.value === value)?.label ?? value;
-
 const editDialogOpen        = ref(false);
 const deleteDialogOpen      = ref(false);
 const createFacultyDialog   = ref(false);
