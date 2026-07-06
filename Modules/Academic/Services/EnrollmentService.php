@@ -116,7 +116,7 @@ class EnrollmentService
 
             // 1. Buscar estudiante por cédula
             $student = Student::whereHas('person', fn ($q) =>
-                $q->where('identification', $row['cedula'])
+                $q->where('identification_number', $row['cedula'])
             )->with('person')->first();
 
             if (! $student) {
@@ -346,4 +346,16 @@ class EnrollmentService
             ];
         })->values()->all();
     }
+
+    /**
+     * Wrapper público de validatePrerequisites() para que otros services
+     * (como BulkAdmissionService) puedan validar sin duplicar lógica.
+     *
+     * @throws \DomainException
+     */
+    public function validatePrerequisitesPublic(int $studentId, array $curriculaIds): void
+    {
+        $this->validatePrerequisites($studentId, $curriculaIds);
+    }
+    
 }

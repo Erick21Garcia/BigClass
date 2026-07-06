@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Modules\Academic\Exports\BulkEnrollmentTemplateExport;
+use Modules\Academic\Exports\BulkAdmissionTemplateExport;
+use Modules\Academic\Http\Requests\BulkAdmissionRequest;
+use Modules\Academic\Services\BulkAdmissionService;
 use Modules\Academic\Http\Requests\BulkEnrollmentRequest;
 use Modules\Academic\Http\Requests\StoreEnrollmentRequest;
 use Modules\Academic\Http\Requests\UpdateEnrollmentRequest;
@@ -18,7 +21,8 @@ use Modules\People\Models\Student;
 class EnrollmentController extends Controller
 {
     public function __construct(
-        private EnrollmentService $enrollmentService
+        private EnrollmentService $enrollmentService,
+        private BulkAdmissionService $bulkAdmissionService,
     ) {}
 
     // =========================================================================
@@ -348,4 +352,74 @@ class EnrollmentController extends Controller
             'skipped'        => $report['skipped'],
         ]);
     }
+
+    /**
+     * Descarga la plantilla Excel para alta masiva (Persona + Estudiante + Matrícula).
+     */
+    public function bulkAdmissionTemplate()
+    {
+        return Excel::download(
+            new BulkAdmissionTemplateExport(),
+            'plantilla-alta-masiva.xlsx',
+        );
+    }
+    
+    /**
+     * Previsualiza el Excel de alta masiva: indica qué personas/estudiantes
+     * ya existen, cuáles se crearán, y qué filas tienen errores.
+     */
+    public function bulkAdmissionPreview(BulkAdmissionRequest $request)
+    {
+        $semester = Semester::findOrFail($request->integer('semester_id'));
+    
+        $preview = $this->bulkAdmissionService->bulkPreview(
+            file:             $request->file('file'),
+            semesterId:       $semester->id,
+            careerId:         $semester->career_id,
+            academicPeriodId: $request->integer('academic_period_id'),
+        );
+    
+        return response()->json([
+            'preview'    => $preview,
+            'total'      => count($preview),
+            'can_enroll' => collect($preview)->where('can_enroll', true)->count(),
+            'will_skip'  => collect($preview)->where('can_enroll', false)->count(),
+        ]);
+    }
+    
+    /**
+     * Ejecuta la cascada Persona → Estudiante → Matrícula para las filas válidas.
+     */
+    public function bulkAdmissionStore(BulkAdmissionRequest $request)
+    {
+        $semester = Semester::findOrFail($request->integer('semester_id'));
+    
+        // Re-genera el preview desde el archivo, nunca confía en datos del cliente
+        $preview = $this->bulkAdmissionService->bulkPreview(
+            file:             $request->file('file'),
+            semesterId:       $semester->id,
+            careerId:         $semester->career_id,
+            academicPeriodId: $request->integer('academic_period_id'),
+        );
+    
+        $report = $this->bulkAdmissionService->bulkCreate(
+            rows:       $preview,
+            sharedData: [
+                'semester_id'        => $semester->id,
+                'academic_period_id' => $request->integer('academic_period_id'),
+                'type'               => $request->input('type'),
+                'status'             => $request->input('status'),
+                'enrollment_date'    => $request->input('enrollment_date'),
+            ],
+        );
+    
+        return response()->json([
+            'success'       => true,
+            'created_count' => $report['created_count'],
+            'skipped_count' => $report['skipped_count'],
+            'created'       => $report['created'],
+            'skipped'       => $report['skipped'],
+        ]);
+    }
+
 }

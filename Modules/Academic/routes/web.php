@@ -33,14 +33,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/grades',                                       [GradeController::class, 'store'])->name('grades.store');
     Route::delete('/grades/{grade}',                             [GradeController::class, 'destroy'])->name('grades.destroy');
 
-    // ── Matrículas ────────────────────────────────────────────────────────────
-    Route::get('/enrollments',                                   [EnrollmentController::class, 'index'])->name('enrollments.index');
-    Route::get('/enrollments/create',                            [EnrollmentController::class, 'create'])->name('enrollments.create');
-
     // ── Matrícula masiva ────────────────────────────────────────────────────────────
     Route::get('/enrollments/bulk-template',                     [EnrollmentController::class, 'bulkTemplate'])->name('enrollments.bulk-template');
     Route::post('/enrollments/bulk-preview',                     [EnrollmentController::class, 'bulkPreview'])->name('enrollments.bulk-preview');
     Route::post('/enrollments/bulk-store',                       [EnrollmentController::class, 'bulkStore'])->name('enrollments.bulk-store');
+    Route::get('/enrollments/bulk-admission-template',           [EnrollmentController::class, 'bulkAdmissionTemplate'])->name('enrollments.bulk-admission-template');
+    Route::post('/enrollments/bulk-admission-preview',           [EnrollmentController::class, 'bulkAdmissionPreview'])->name('enrollments.bulk-admission-preview');
+    Route::post('/enrollments/bulk-admission-store',             [EnrollmentController::class, 'bulkAdmissionStore'])->name('enrollments.bulk-admission-store');
+
+    // ── Matrículas views ────────────────────────────────────────────────────────────
+    Route::get('/enrollments',                                   [EnrollmentController::class, 'index'])->name('enrollments.index');
+    Route::get('/enrollments/create',                            [EnrollmentController::class, 'create'])->name('enrollments.create');
 
     // ── Matrículas ────────────────────────────────────────────────────────────
     Route::post('/enrollments',                                  [EnrollmentController::class, 'store'])->name('enrollments.store');
