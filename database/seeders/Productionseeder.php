@@ -9,20 +9,20 @@ class ProductionSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            // 1. Institución
-            \Modules\Institucion\Database\Seeders\InstitutionProductionSeeder::class,
+            // 1. Institucion
+            \Modules\Institucion\database\seeders\InstitutionProductionSeeder::class,
 
             // 2. Personas, usuarios, docentes, estudiantes, admins
-            \Modules\People\Database\Seeders\PeopleProductionSeeder::class,
+            \Modules\People\database\seeders\PeopleProductionSeeder::class,
 
             // 3. Períodos académicos + parámetros de evaluación
-            \Modules\Academic\Database\Seeders\AcademicPeriodProductionSeeder::class,
+            \Modules\Academic\database\seeders\AcademicPeriodProductionSeeder::class,
 
             // 4. Aulas
-            \Modules\Institucion\Database\Seeders\ClassroomProductionSeeder::class,
+            \Modules\Institucion\database\seeders\ClassroomProductionSeeder::class,
 
             // 5. Matrículas, secciones, horarios, notas
-            \Modules\Academic\Database\Seeders\EnrollmentProductionSeeder::class,
+            \Modules\Academic\database\seeders\EnrollmentProductionSeeder::class,
         ]);
     }
 }
