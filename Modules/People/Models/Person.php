@@ -35,6 +35,8 @@ class Person extends Model
         'countries_id',
         'provinces_id',
         'cities_id',
+
+        'user_id'
     ];
 
     protected $casts = [
@@ -91,4 +93,10 @@ class Person extends Model
     {
         return $this->belongsTo(\App\Models\City::class, 'cities_id');
     }
+
+    public function user()
+    {
+        return $this->belongsTo(\App\Models\User::class);
+    }
+
 }

@@ -8,6 +8,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Spatie\Permission\Traits\HasRoles;
+use Modules\People\Models\Person;
 
 class User extends Authenticatable
 {
@@ -50,4 +51,10 @@ class User extends Authenticatable
             'two_factor_confirmed_at' => 'datetime',
         ];
     }
+
+    public function person()
+    {
+        return $this->hasOne(Person::class);
+    }
+
 }

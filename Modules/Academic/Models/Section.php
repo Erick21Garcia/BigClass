@@ -7,6 +7,8 @@ use Spatie\Activitylog\Support\LogOptions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Modules\LMS\Models\VirtualCourse;
 
 class Section extends Model
 {
@@ -55,6 +57,11 @@ class Section extends Model
         return LogOptions::defaults()
             ->logOnly(['curricula_id', 'teacher_id', 'academic_period_id', 'name', 'quota', 'active'])
             ->logOnlyDirty();
+    }
+
+    public function virtualCourse(): HasOne
+    {
+        return $this->hasOne(VirtualCourse::class);
     }
 
 }

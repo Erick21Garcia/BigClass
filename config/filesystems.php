@@ -60,6 +60,14 @@ return [
             'report' => false,
         ],
 
+        'lms_materials' => [
+            'driver' => 'local',
+            'root' => storage_path('app/lms_materials'),
+            'url' => env('APP_URL').'/storage/lms_materials',
+            'visibility' => 'private',
+            'throw' => false,
+        ],
+
     ],
 
     /*

@@ -33,4 +33,10 @@ class Teacher extends Model
     {
         return $this->belongsTo(Institution::class);
     }
+
+    public function user()
+    {
+        return $this->person?->user;
+    }
+
 }

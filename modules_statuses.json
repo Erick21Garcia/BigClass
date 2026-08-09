@@ -1,5 +1,6 @@
 {
     "People": true,
     "Institucion": true,
-    "Academic": true
+    "Academic": true,
+    "LMS": true
 }
