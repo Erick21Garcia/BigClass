@@ -8,6 +8,7 @@ use Modules\Academic\Models\AcademicPeriod;
 use Modules\Academic\Models\Enrollment;
 use Modules\Academic\Models\EnrollmentItem;
 use Modules\Academic\Models\Grade;
+use Modules\Academic\Events\AcademicPeriodClosed;
 
 class ClosePeriodService
 {
@@ -50,6 +51,8 @@ class ClosePeriodService
                 'closed_by' => $userId,
             ]);
         });
+
+        event(new AcademicPeriodClosed($period));
 
         return $this->report;
     }

@@ -3,10 +3,16 @@
 namespace Modules\LMS\Providers;
 
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Modules\Academic\Events\AcademicPeriodClosed;
+use Modules\LMS\Listeners\SendPeriodClosedNotifications;
 
 class EventServiceProvider extends ServiceProvider
 {
-    protected $listen = [];
+    protected $listen = [
+        AcademicPeriodClosed::class => [
+            SendPeriodClosedNotifications::class,
+        ],
+    ];
 
     protected $subscribe = [];
 

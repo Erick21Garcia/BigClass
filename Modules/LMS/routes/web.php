@@ -30,6 +30,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/lms/assignments/{assignment}',          [AssignmentController::class, 'destroy'])->name('lms.assignments.destroy');
     Route::post('/lms/assignments/{assignment}/submit',     [AssignmentController::class, 'submit'])->name('lms.assignments.submit');
     Route::post('/lms/submissions/{submission}/grade',      [AssignmentController::class, 'grade'])->name('lms.submissions.grade');
+
+    // ── Cuestionarios (Quiz) ───────────────────────────────────────────────────
+    Route::post('/lms/units/{unit}/quizzes',                [QuizController::class, 'store'])->name('lms.quizzes.store');
+    Route::put('/lms/quizzes/{quiz}',                       [QuizController::class, 'update'])->name('lms.quizzes.update');
+    Route::delete('/lms/quizzes/{quiz}',                    [QuizController::class, 'destroy'])->name('lms.quizzes.destroy');
+    Route::post('/lms/quizzes/{quiz}/questions',            [QuizController::class, 'addQuestion'])->name('lms.quizzes.questions.store');
+    Route::delete('/lms/quiz-questions/{question}',         [QuizController::class, 'deleteQuestion'])->name('lms.quizzes.questions.destroy');
+    Route::post('/lms/quizzes/{quiz}/attempts',             [QuizAttemptController::class, 'start'])->name('lms.quiz-attempts.start');
+    Route::post('/lms/quiz-attempts/{attempt}/submit',      [QuizAttemptController::class, 'submit'])->name('lms.quiz-attempts.submit');
+    Route::post('/lms/quiz-attempts/{attempt}/grade-essay', [QuizAttemptController::class, 'gradeEssay'])->name('lms.quiz-attempts.grade-essay');
+
+    // ── Progreso (ResourceView) ───────────────────────────────────────────────────
+    Route::post('/lms/resources/{resource}/mark-viewed', [ProgressController::class, 'markViewed'])->name('lms.resources.mark-viewed');
+    Route::get('/lms/virtual-courses/{virtualCourse}/progress', [ProgressController::class, 'show'])->name('lms.virtual-courses.progress');
+
 });
 
 // Ruta firmada — fuera del grupo 'auth' porque la validación de acceso

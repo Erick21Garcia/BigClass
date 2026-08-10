@@ -4,6 +4,7 @@ namespace Modules\LMS\Services;
 
 use Modules\Academic\Models\EnrollmentItem;
 use Modules\Academic\Models\Grade;
+use Modules\Academic\Models\Section;
 use Modules\LMS\Models\AssignmentSubmission;
 
 class GradeSyncService
@@ -23,20 +24,36 @@ class GradeSyncService
         $assignment = $submission->assignment;
         $section = $assignment->unit->virtualCourse->section;
 
+        return $this->syncScore(
+            section: $section,
+            studentId: $submission->student_id,
+            evaluationParameterId: $assignment->evaluation_parameter_id,
+            score: (float) $submission->grade,
+            observations: $submission->feedback,
+        );
+    }
+
+    /**
+     * Genérico — usado por Assignments (arriba) y por Quizzes
+     * (QuizAttemptService), ya que ambos terminan en el mismo lugar:
+     * un score que hay que escribir en el EnrollmentItem correcto.
+     */
+    public function syncScore(Section $section, int $studentId, int $evaluationParameterId, float $score, ?string $observations = null): Grade
+    {
         $enrollmentItem = EnrollmentItem::where('section_id', $section->id)
-            ->whereHas('enrollment', fn ($q) => $q->where('student_id', $submission->student_id))
+            ->whereHas('enrollment', fn ($q) => $q->where('student_id', $studentId))
             ->first();
 
         if (! $enrollmentItem) {
             throw new \RuntimeException(
-                "No se encontró matrícula del estudiante #{$submission->student_id} en la sección #{$section->id}. " .
+                "No se encontró matrícula del estudiante #{$studentId} en la sección #{$section->id}. " .
                 'No se puede sincronizar la nota con el ISI.'
             );
         }
 
         $grade = Grade::firstOrNew([
             'enrollment_item_id'      => $enrollmentItem->id,
-            'evaluation_parameter_id' => $assignment->evaluation_parameter_id,
+            'evaluation_parameter_id' => $evaluationParameterId,
         ]);
 
         // Respeta el bloqueo de ClosePeriodService: si el periodo ya cerró
@@ -48,8 +65,8 @@ class GradeSyncService
             );
         }
 
-        $grade->score = $submission->grade;
-        $grade->observations = $submission->feedback;
+        $grade->score = $score;
+        $grade->observations = $observations;
         $grade->active = true;
         $grade->save();
 

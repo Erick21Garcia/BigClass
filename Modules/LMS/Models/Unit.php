@@ -52,7 +52,10 @@ class Unit extends Model
         return $this->hasMany(Assignment::class);
     }
 
-    // NOTA: aquí se agregará hasMany(Quiz::class) cuando implementemos el Punto 6.
+    public function quizzes(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Quiz::class);
+    }
 
     public function getActivitylogOptions(): LogOptions
     {
