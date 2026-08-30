@@ -151,8 +151,9 @@ class PeopleProductionSeeder extends Seeder
             'email'             => $email,
             'password'          => Hash::make($password),
             'email_verified_at' => now(),
-            'person_id'         => $person->id,
         ]);
+
+        $person->update(['user_id' => $user->id]);
 
         Admin::create([
             'person_id'      => $person->id,
@@ -184,8 +185,9 @@ class PeopleProductionSeeder extends Seeder
             'email'             => $email,
             'password'          => Hash::make('password'),
             'email_verified_at' => now(),
-            'person_id'         => $person->id,
         ]);
+
+        $person->update(['user_id' => $user->id]);
 
         Teacher::create([
             'person_id'       => $person->id,
@@ -221,8 +223,9 @@ class PeopleProductionSeeder extends Seeder
             'email'             => $email,
             'password'          => Hash::make('password'),
             'email_verified_at' => now(),
-            'person_id'         => $person->id,
         ]);
+
+        $person->update(['user_id' => $user->id]);
 
         Student::create([
             'person_id'         => $person->id,

@@ -65,6 +65,32 @@ class AssignmentController extends Controller
             return back()->withErrors(['grade' => $e->getMessage()]);
         }
 
-        return back()->with('success', 'Calificación guardada.');
+        return redirect()
+            ->route('lms.teacher.gradebook', $submission->assignment->unit->virtualCourse->id)
+            ->with('success', 'Calificación guardada.');
+    }
+
+    /**
+     * Pantalla de calificación — pieza #5 pendiente.
+     */
+    public function gradeForm(AssignmentSubmission $submission): \Inertia\Response
+    {
+        $submission->load('files', 'student.person', 'assignment');
+
+        return \Inertia\Inertia::render('lms/teacher/GradeSubmission', [
+            'submission' => [
+                'id'            => $submission->id,
+                'student_name'  => $submission->student->person->full_name,
+                'assignment_title' => $submission->assignment->title,
+                'submitted_at'  => $submission->submitted_at,
+                'is_late'       => $submission->is_late,
+                'grade'         => $submission->grade,
+                'feedback'      => $submission->feedback,
+                'files'         => $submission->files->map(fn ($f) => [
+                    'id' => $f->id,
+                    'original_name' => $f->original_name,
+                ]),
+            ],
+        ]);
     }
 }

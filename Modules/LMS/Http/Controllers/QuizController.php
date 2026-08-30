@@ -51,4 +51,33 @@ class QuizController extends Controller
 
         return back()->with('success', 'Pregunta eliminada.');
     }
+
+    /**
+     * Editor de cuestionario — Punto 2 del backlog docente. Pantalla
+     * dedicada aparte (no inline), por la densidad de armar preguntas.
+     */
+    public function edit(Quiz $quiz): \Inertia\Response
+    {
+        $quiz->load('questions.options', 'unit.virtualCourse');
+
+        return \Inertia\Inertia::render('lms/teacher/QuizEditor', [
+            'quiz' => [
+                'id'           => $quiz->id,
+                'title'        => $quiz->title,
+                'max_attempts' => $quiz->max_attempts,
+            ],
+            'virtual_course_id' => $quiz->unit->virtualCourse->id,
+            'questions' => $quiz->questions->map(fn ($q) => [
+                'id'       => $q->id,
+                'type'     => $q->type,
+                'question' => $q->question,
+                'points'   => $q->points,
+                'options'  => $q->options->map(fn ($o) => [
+                    'id'          => $o->id,
+                    'option_text' => $o->option_text,
+                    'is_correct'  => $o->is_correct,
+                ]),
+            ]),
+        ]);
+    }
 }

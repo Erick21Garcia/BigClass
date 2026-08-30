@@ -107,6 +107,23 @@ const navGroups = computed<NavGroup[]>(() => {
             ],
         },
         {
+            label: 'Aula Virtual',
+            items: [
+                {
+                    title: 'Mis materias',
+                    href: '/lms/mis-materias-docente',
+                    icon: BookOpen,
+                    role: ['docente'],
+                },
+                {
+                    title: 'Mis materias',
+                    href: '/lms/mis-materias',
+                    icon: GraduationCap,
+                    role: ['estudiante'],
+                },
+            ],
+        },
+        {
             label: 'Sistema',
             items: [
                 {

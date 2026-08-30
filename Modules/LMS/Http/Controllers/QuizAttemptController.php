@@ -29,18 +29,46 @@ class QuizAttemptController extends Controller
             return back()->withErrors(['attempt' => $e->getMessage()]);
         }
 
-        // NOTA: cuando construyamos el frontend, esto probablemente cambie
-        // a un redirect()->route('lms.quiz-attempts.show', $attempt) hacia
-        // la vista de "resolver cuestionario". Por ahora, sin esa ruta
-        // todavía, se devuelve el ID del intento creado.
-        return back()->with('success', 'Cuestionario iniciado.')->with('attempt_id', $attempt->id);
+        return redirect()->route('lms.quiz-attempts.show', $attempt);
+    }
+
+    /**
+     * Pantalla de responder el cuestionario — pieza #4 pendiente, parte 2.
+     * NUNCA se expone is_correct de las opciones aquí (solo en el
+     * QuizController::edit del docente).
+     */
+    public function show(\Illuminate\Http\Request $request, QuizAttempt $attempt): \Inertia\Response
+    {
+        $student = \Modules\People\Models\Student::whereHas('person', fn ($q) => $q->where('user_id', $request->user()->id))
+            ->firstOrFail();
+
+        abort_unless($attempt->student_id === $student->id, 403);
+        abort_unless($attempt->status === 'in_progress', 403, 'Este intento ya fue entregado.');
+
+        $attempt->load('quiz.questions.options');
+
+        return \Inertia\Inertia::render('lms/student/QuizAttempt', [
+            'virtual_course_id' => $attempt->quiz->unit->virtualCourse->id,
+            'attempt' => ['id' => $attempt->id],
+            'quiz'    => ['id' => $attempt->quiz->id, 'title' => $attempt->quiz->title],
+            'questions' => $attempt->quiz->questions->map(fn ($q) => [
+                'id'       => $q->id,
+                'type'     => $q->type,
+                'question' => $q->question,
+                'options'  => $q->type === 'multiple_choice'
+                    ? $q->options->map(fn ($o) => ['id' => $o->id, 'option_text' => $o->option_text])
+                    : [],
+            ]),
+        ]);
     }
 
     public function submit(SubmitQuizAttemptRequest $request, QuizAttempt $attempt): RedirectResponse
     {
         $this->quizAttemptService->submitAttempt($attempt, $request->validated('answers'));
 
-        return back()->with('success', 'Cuestionario entregado correctamente.');
+        return redirect()
+            ->route('lms.student.quiz', $attempt->quiz_id)
+            ->with('success', 'Cuestionario entregado correctamente.');
     }
 
     public function gradeEssay(GradeQuizEssayRequest $request, QuizAttempt $attempt): RedirectResponse
@@ -55,6 +83,35 @@ class QuizAttemptController extends Controller
             return back()->withErrors(['grade' => $e->getMessage()]);
         }
 
-        return back()->with('success', 'Cuestionario calificado.');
+        return redirect()
+            ->route('lms.teacher.gradebook', $attempt->quiz->unit->virtualCourse->id)
+            ->with('success', 'Cuestionario calificado.');
+    }
+
+    /**
+     * Pantalla de calificación de ensayos — pieza #5 pendiente.
+     * Solo muestra las preguntas de tipo 'essay' (las de opción múltiple
+     * ya se autocalificaron).
+     */
+    public function gradeForm(QuizAttempt $attempt): \Inertia\Response
+    {
+        $attempt->load('student.person', 'quiz', 'answers.question');
+
+        $essayAnswers = $attempt->answers->filter(fn ($a) => $a->question->type === 'essay');
+
+        return \Inertia\Inertia::render('lms/teacher/GradeQuizAttempt', [
+            'attempt' => [
+                'id'           => $attempt->id,
+                'student_name' => $attempt->student->person->full_name,
+                'quiz_title'   => $attempt->quiz->title,
+                'auto_score'   => $attempt->auto_score,
+            ],
+            'essay_answers' => $essayAnswers->map(fn ($a) => [
+                'question_id'    => $a->quiz_question_id,
+                'question'       => $a->question->question,
+                'written_answer' => $a->written_answer,
+                'max_points'     => $a->question->points,
+            ])->values(),
+        ]);
     }
 }
