@@ -95,22 +95,31 @@ class QuizAttemptController extends Controller
      */
     public function gradeForm(QuizAttempt $attempt): \Inertia\Response
     {
-        $attempt->load('student.person', 'quiz', 'answers.question');
+        $attempt->load('student.person', 'quiz', 'answers.question.options');
 
         $essayAnswers = $attempt->answers->filter(fn ($a) => $a->question->type === 'essay');
+        $mcAnswers = $attempt->answers->filter(fn ($a) => $a->question->type === 'multiple_choice');
 
         return \Inertia\Inertia::render('lms/teacher/GradeQuizAttempt', [
             'attempt' => [
                 'id'           => $attempt->id,
                 'student_name' => $attempt->student->person->full_name,
                 'quiz_title'   => $attempt->quiz->title,
-                'auto_score'   => $attempt->auto_score,
+                'auto_score'   => (float) $attempt->auto_score,
             ],
+            'multiple_choice_answers' => $mcAnswers->map(fn ($a) => [
+                'question'       => $a->question->question,
+                'selected_text'  => $a->selectedOption?->option_text,
+                'correct_text'   => $a->question->correctOption()?->option_text,
+                'is_correct'     => $a->selected_option_id === $a->question->correctOption()?->id,
+                'points_awarded' => (float) $a->points_awarded,
+                'max_points'     => (float) $a->question->points,
+            ])->values(),
             'essay_answers' => $essayAnswers->map(fn ($a) => [
                 'question_id'    => $a->quiz_question_id,
                 'question'       => $a->question->question,
                 'written_answer' => $a->written_answer,
-                'max_points'     => $a->question->points,
+                'max_points'     => (float) $a->question->points,
             ])->values(),
         ]);
     }
