@@ -68,6 +68,13 @@ return [
             'throw' => false,
         ],
 
+        'admissions_documents' => [
+            'driver' => 'local',
+            'root' => storage_path('app/admissions_documents'),
+            'visibility' => 'private',
+            'throw' => false,
+        ],
+
     ],
 
     /*

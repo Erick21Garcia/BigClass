@@ -2,5 +2,6 @@
     "People": true,
     "Institucion": true,
     "Academic": true,
-    "LMS": true
+    "LMS": true,
+    "Admissions": true
 }

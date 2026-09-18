@@ -107,6 +107,23 @@ const navGroups = computed<NavGroup[]>(() => {
             ],
         },
         {
+            label: 'Admisiones',
+            items: [
+                {
+                    title: 'Revisión de postulaciones',
+                    href: '/admisiones/revision',
+                    icon: ClipboardList,
+                    role: ['admin', 'super-admin'],
+                },
+                {
+                    title: 'Configuración de admisiones',
+                    href: '/admisiones/configuracion',
+                    icon: Settings,
+                    role: ['admin', 'super-admin'],
+                },
+            ],
+        },
+        {
             label: 'Aula Virtual',
             items: [
                 {
