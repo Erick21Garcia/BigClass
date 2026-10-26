@@ -1,16 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { router } from '@inertiajs/vue3';
-import { Head } from '@inertiajs/vue3';
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
+import { Head, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import {
-    ChevronLeft, ChevronRight, Calendar, PanelRightClose,
-    PanelRightOpen, AlertTriangle, BookOpen, Plus, Clock,
+    AlertTriangle, BookOpen, CalendarDays, CalendarPlus, CheckCircle2, ChevronLeft,
+    ChevronRight, ClipboardCheck, Clock, MapPin, Pencil, PanelRightClose,
+    PanelRightOpen, Plus, Repeat, Trash2, User,
 } from 'lucide-vue-next';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
     DialogDescription, DialogFooter,
@@ -87,19 +85,30 @@ const conflicts     = ref<Conflict[]>([]);
 const unassigned    = ref<Unassigned[]>([]);
 const loadingEvents = ref(false);
 
-const today       = new Date();
+// "Ahora" reactivo: mueve la línea roja y marca la clase en curso.
+const now         = ref(new Date());
 const currentDate = ref(new Date());
+let clock: ReturnType<typeof setInterval>;
+
+const views = [
+    { key: 'day',   label: 'Día' },
+    { key: 'week',  label: 'Semana' },
+    { key: 'month', label: 'Mes' },
+] as const;
 
 const DAYS_LABEL = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const DAYS_FULL  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const MONTHS     = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                     'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-const HOURS = Array.from({ length: 16 }, (_, i) => i + 7);
+const HOURS      = Array.from({ length: 16 }, (_, i) => i + 7);
+const GRID_START = 7 * 60;
+const HOUR_PX    = 80;
 
+// Lunes de la semana visible (antes los domingos saltaba a la semana siguiente).
 const weekStart = computed(() => {
     const d = new Date(currentDate.value);
-    d.setDate(d.getDate() - d.getDay() + 1);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
     return d;
 });
 
@@ -111,15 +120,32 @@ const weekDays = computed(() => {
     });
 });
 
-const weekLabel = computed(() => {
-    const s = weekDays.value[0];
-    const e = weekDays.value[5];
-    return `Semana: ${MONTHS[s.getMonth()].slice(0,3)} ${s.getDate()} - ${e.getDate()}, ${e.getFullYear()}`;
-});
+// Columnas visibles: una en vista día, seis en vista semana.
+const columns = computed(() => (currentView.value === 'day' ? [currentDate.value] : weekDays.value));
+const gridCols = computed(() => ({
+    gridTemplateColumns: `72px repeat(${columns.value.length}, minmax(0, 1fr))`,
+}));
 
-const monthLabel = computed(() =>
-    `${MONTHS[currentDate.value.getMonth()]} ${currentDate.value.getFullYear()}`
-);
+const dateLabel = computed(() => {
+    const d = currentDate.value;
+    if (currentView.value === 'month')
+        return { strong: MONTHS[d.getMonth()], rest: ` ${d.getFullYear()}` };
+    if (currentView.value === 'day')
+        return {
+            strong: `${DAYS_FULL[d.getDay()]} ${d.getDate()} de ${MONTHS[d.getMonth()].toLowerCase()}`,
+            rest: ` de ${d.getFullYear()}`,
+        };
+    const s  = weekDays.value[0];
+    const e  = weekDays.value[5];
+    const ms = MONTHS[s.getMonth()].toLowerCase();
+    const me = MONTHS[e.getMonth()].toLowerCase();
+    return {
+        strong: s.getMonth() === e.getMonth()
+            ? `${s.getDate()} – ${e.getDate()} de ${me}`
+            : `${s.getDate()} ${ms.slice(0, 3)} – ${e.getDate()} ${me.slice(0, 3)}`,
+        rest: ` de ${e.getFullYear()}`,
+    };
+});
 
 const navigate = (dir: -1 | 1) => {
     const d = new Date(currentDate.value);
@@ -132,7 +158,7 @@ const navigate = (dir: -1 | 1) => {
 const goToday = () => { currentDate.value = new Date(); };
 
 const isToday = (date: Date) =>
-    date.toDateString() === today.toDateString();
+    date.toDateString() === now.value.toDateString();
 
 const loadEvents = async () => {
     if (!selectedPeriodId.value) return;
@@ -152,33 +178,106 @@ const loadEvents = async () => {
     }
 };
 
-onMounted(loadEvents);
-
 const timeToMinutes = (t: string) => {
     const [h, m] = t.split(':').map(Number);
     return h * 60 + m;
 };
 
-const GRID_START = 7 * 60;
-const HOUR_PX    = 60;
+const hhmm = (t: string) => t.slice(0, 5);
 
+// Posición vertical del bloque (el color ahora sale de la paleta de la marca).
 const eventStyle = (ev: ScheduleEvent) => {
     const start  = timeToMinutes(ev.start_time) - GRID_START;
     const dur    = timeToMinutes(ev.end_time) - timeToMinutes(ev.start_time);
     const top    = (start / 60) * HOUR_PX;
     const height = (dur / 60) * HOUR_PX;
     return {
-        top:             `${top}px`,
-        height:          `${Math.max(height - 4, 20)}px`,
-        backgroundColor: ev.color,
-        opacity:         0.92,
+        top:    `${top + 3}px`,
+        height: `${Math.max(height - 6, 24)}px`,
     };
 };
+
+const isCompact = (ev: ScheduleEvent) =>
+    timeToMinutes(ev.end_time) - timeToMinutes(ev.start_time) <= 60;
 
 const eventsByDay = (dayOfWeek: number) =>
     events.value.filter(e => e.day_of_week === dayOfWeek);
 
 const jsDateToDayOfWeek = (d: Date) => d.getDay();
+
+const classLabel = (n: number) =>
+    n === 0 ? 'Sin clases' : n === 1 ? '1 clase' : `${n} clases`;
+
+// ── Hora actual y clase en curso ─────────────────────────────────────
+const nowMinutes = computed(() => now.value.getHours() * 60 + now.value.getMinutes());
+const nowTop     = computed(() => ((nowMinutes.value - GRID_START) / 60) * HOUR_PX);
+const nowVisible = computed(
+    () => nowMinutes.value >= GRID_START && nowMinutes.value <= GRID_START + HOURS.length * 60,
+);
+const nowLabel = computed(
+    () => `${String(now.value.getHours()).padStart(2, '0')}:${String(now.value.getMinutes()).padStart(2, '0')}`,
+);
+
+const isLive = (ev: ScheduleEvent, day: Date) =>
+    isToday(day)
+    && nowMinutes.value >= timeToMinutes(ev.start_time)
+    && nowMinutes.value <  timeToMinutes(ev.end_time);
+
+// ── Colores por materia (paleta de la marca) ─────────────────────────
+const palette = [
+    {
+        card: 'bg-gradient-to-br from-[#1E3A5F] to-[#214EA4] text-white',
+        chip: 'bg-white/20',
+        tool: 'bg-white/20 hover:bg-white/35',
+        pill: 'bg-[#1E3A5F] text-white',
+    },
+    {
+        card: 'bg-gradient-to-br from-[#214EA4] to-[#3F7BE0] text-white',
+        chip: 'bg-white/20',
+        tool: 'bg-white/20 hover:bg-white/35',
+        pill: 'bg-[#214EA4] text-white',
+    },
+    {
+        card: 'bg-gradient-to-br from-[#5E97F0] to-[#8CB8FF] text-[#0B2545]',
+        chip: 'bg-white/50',
+        tool: 'bg-white/40 hover:bg-white/60',
+        pill: 'bg-[#8CB8FF] text-[#0B2545]',
+    },
+    {
+        card: 'border border-[#C9DAF7] border-l-[5px] border-l-[#214EA4] bg-[#E8EEFB] text-[#0B2545]',
+        chip: 'bg-white text-[#214EA4]',
+        tool: 'bg-white hover:bg-[#C9DAF7]',
+        pill: 'border border-[#C9DAF7] bg-[#E8EEFB] text-[#1E3A5F]',
+    },
+];
+
+const subjectOrder = computed(() => {
+    const ids = [...new Set(events.value.map(e => e.curricula_id))].sort((a, b) => a - b);
+    return new Map(ids.map((id, i) => [id, i]));
+});
+
+const tone = (ev: ScheduleEvent) =>
+    palette[(subjectOrder.value.get(ev.curricula_id) ?? 0) % palette.length];
+
+// ── Scroll inicial hacia la hora actual ──────────────────────────────
+const scroller = ref<HTMLElement | null>(null);
+
+const scrollToNow = async () => {
+    await nextTick();
+    if (!scroller.value || !nowVisible.value) return;
+    scroller.value.scrollTop = Math.max(0, nowTop.value - HOUR_PX * 1.5);
+};
+
+onMounted(() => {
+    clock = setInterval(() => { now.value = new Date(); }, 30_000);
+    loadEvents();
+    scrollToNow();
+});
+onUnmounted(() => clearInterval(clock));
+
+// Hora donde se hizo clic en la grilla (para precargar el diálogo).
+const hourAt = (e: MouseEvent) =>
+    Math.min(21, Math.max(7, 7 + Math.floor(e.offsetY / HOUR_PX)));
 
 const createDialogOpen = ref(false);
 const creating         = ref(false);
@@ -273,7 +372,15 @@ const handleCreate = async () => {
 };
 
 const editingSchedule = ref<ScheduleEvent | null>(null);
-const dialogMode      = computed(() => editingSchedule.value ? 'edit' : 'create');
+const dialogMode = computed(() => editingSchedule.value ? 'edit' : 'create');
+
+const selectedPeriodName = computed(
+    () => props.academicPeriods.find((p) => String(p.id) === selectedPeriodId.value)?.name ?? '',
+);
+
+const fieldClass =
+    'h-11 w-full rounded-xl border-[1.5px] border-transparent bg-[#E8EEFB] px-3.5 text-sm text-[#0B2545] shadow-none placeholder:text-[#7B8AA3] focus-visible:border-[#1E3A5F] focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-[#1E3A5F]/10 dark:bg-muted dark:text-foreground';
+const labelClass = 'text-[13px] font-semibold text-[#0B2545] dark:text-foreground';
 
 const openEditDialog = (ev: ScheduleEvent) => {
     editingSchedule.value = ev;
@@ -294,6 +401,7 @@ const openEditDialog = (ev: ScheduleEvent) => {
 };
 
 const deleteSchedule = async (scheduleId: number) => {
+    if (!window.confirm('¿Eliminar este bloque horario?')) return;
     try {
         await axios.delete(`/schedules/${scheduleId}`);
         toast.success('Horario eliminado');
@@ -316,472 +424,615 @@ const monthDays = computed(() => {
     return days;
 });
 
+// Devuelve todos los del día; la vista muestra 3 y un "+N más".
 const eventsForMonthDay = (date: Date | null) => {
     if (!date) return [];
-    const dow = date.getDay();
-    return events.value.filter(e => e.day_of_week === dow).slice(0, 3);
+    return events.value.filter(e => e.day_of_week === date.getDay());
 };
+
+// Estilos de los botones de cristal del banner.
+const glassBtn =
+    'grid h-[34px] min-w-[34px] place-items-center rounded-[10px] border border-white/30 bg-white/15 px-3 text-[13px] font-medium text-white transition hover:bg-white/25';
 </script>
 
 <template>
-    <Head title="Horarios" />
+    <Head title="Horarios">
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&display=swap"
+            rel="stylesheet"
+        />
+    </Head>
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="flex h-full flex-1 flex-col gap-0">
+        <div class="flex h-full flex-1 flex-col gap-4 bg-[#EAF0FB] p-6 dark:bg-transparent">
+            <!-- Banner con los controles -->
+            <div class="relative overflow-hidden rounded-[20px] bg-[linear-gradient(120deg,#1E3A5F,#214EA4)] px-8 py-5 text-white">
+                <div class="pointer-events-none absolute -right-12 -top-28 h-[210px] w-[210px] rotate-45 bg-[#2F63C9]/80"></div>
+                <div class="pointer-events-none absolute -top-32 right-[420px] h-[160px] w-[160px] rotate-45 bg-[#8CB8FF]/[0.16]"></div>
+                <div class="pointer-events-none absolute -bottom-28 -left-12 h-[140px] w-[140px] rotate-45 bg-[#2F63C9]/50"></div>
 
-            <!-- Toolbar -->
-            <div class="flex items-center justify-between border-b px-6 py-3">
-                <div class="flex items-center gap-3">
-                    <!-- Período académico -->
-                    <Select v-model="selectedPeriodId" @update:model-value="loadEvents">
-                        <SelectTrigger class="w-56">
-                            <SelectValue placeholder="Selecciona período" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem
-                                v-for="p in props.academicPeriods"
-                                :key="p.id"
-                                :value="String(p.id)"
-                            >
-                                {{ p.name }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-
-                    <!-- Navegación -->
-                    <div class="flex items-center gap-1">
-                        <Button variant="outline" size="icon" @click="navigate(-1)">
-                            <ChevronLeft class="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" @click="goToday">Hoy</Button>
-                        <Button variant="outline" size="icon" @click="navigate(1)">
-                            <ChevronRight class="h-4 w-4" />
-                        </Button>
-                    </div>
-
-                    <!-- Etiqueta de fecha -->
-                    <span class="text-sm font-medium">
-                        {{ currentView === 'month' ? monthLabel : weekLabel }}
-                    </span>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <!-- Vista -->
-                    <div class="flex rounded-md border">
-                        <Button
-                            v-for="v in (['day','week','month'] as const)"
-                            :key="v"
-                            :variant="currentView === v ? 'default' : 'ghost'"
-                            size="sm"
-                            class="rounded-none first:rounded-l-md last:rounded-r-md"
-                            @click="currentView = v"
-                        >
-                            {{ v === 'day' ? 'Día' : v === 'week' ? 'Semana' : 'Mes' }}
-                        </Button>
-                    </div>
-
-                    <!-- Nuevo horario -->
-                    <Button size="sm" @click="openCreateDialog()">
-                        <Plus class="mr-2 h-4 w-4" /> Nuevo horario
-                    </Button>
-
-                    <!-- Toggle panel -->
-                    <Button variant="outline" size="icon" @click="panelOpen = !panelOpen">
-                        <PanelRightClose v-if="panelOpen" class="h-4 w-4" />
-                        <PanelRightOpen  v-else            class="h-4 w-4" />
-                    </Button>
-                </div>
-            </div>
-
-            <!-- Contenido principal -->
-            <div class="flex flex-1 overflow-hidden">
-
-                <!-- ── VISTA SEMANA ── -->
-                <div v-if="currentView === 'week'" class="flex flex-1 flex-col">
-                    <!-- Header días -->
-                    <div class="grid border-b" style="grid-template-columns: 64px repeat(6, 1fr)">
-                        <div class="border-r" />
-                        <div
-                            v-for="(day, i) in weekDays"
-                            :key="i"
-                            class="border-r px-2 py-2 text-center text-sm last:border-r-0"
-                            :class="isToday(day) ? 'bg-primary/5 font-semibold text-primary' : 'text-muted-foreground'"
-                        >
-                            <div>{{ DAYS_LABEL[day.getDay()] }}</div>
-                            <div
-                                class="mx-auto mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm"
-                                :class="isToday(day) ? 'bg-primary text-primary-foreground' : ''"
-                            >
-                                {{ day.getDate() }}
-                            </div>
+                <div class="relative flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h1 class="acadex-title text-[32px] leading-[1.1]">Horarios</h1>
+                        <div class="mt-2.5 flex items-center gap-2.5">
+                            <button type="button" :class="glassBtn" aria-label="Anterior" @click="navigate(-1)">
+                                <ChevronLeft class="size-4" />
+                            </button>
+                            <button type="button" :class="glassBtn" @click="goToday">Hoy</button>
+                            <button type="button" :class="glassBtn" aria-label="Siguiente" @click="navigate(1)">
+                                <ChevronRight class="size-4" />
+                            </button>
+                            <span class="ml-1.5 text-[14.5px] text-[#E4EDFC]">
+                                <b class="font-semibold text-white">{{ dateLabel.strong }}</b>{{ dateLabel.rest }}
+                            </span>
                         </div>
                     </div>
 
-                    <!-- Grilla horas -->
-                    <div class="flex-1">
-                        <div class="relative grid" style="grid-template-columns: 64px repeat(6, 1fr)">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <!-- Período académico -->
+                        <Select v-model="selectedPeriodId" @update:model-value="loadEvents">
+                            <SelectTrigger
+                                class="h-11 w-[290px] rounded-xl !border-white/30 !bg-white/15 !text-white focus:ring-white/40 [&_svg]:!text-white/80 [&_svg]:!opacity-100"
+                            >
+                                <SelectValue placeholder="Selecciona período" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="p in props.academicPeriods"
+                                    :key="p.id"
+                                    :value="String(p.id)"
+                                >
+                                    {{ p.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
 
-                            <!-- Columna horas -->
-                            <div>
-                                <div
+                        <!-- Vista -->
+                        <div class="flex gap-1 rounded-xl border border-white/30 bg-white/15 p-1">
+                            <button
+                                v-for="v in views"
+                                :key="v.key"
+                                type="button"
+                                class="h-[34px] rounded-[9px] px-4 text-[13.5px] font-medium transition"
+                                :class="
+                                    currentView === v.key
+                                        ? 'bg-white font-semibold text-[#1E3A5F] shadow-[0_6px_14px_-8px_rgba(0,0,0,0.5)]'
+                                        : 'text-[#DDEBFF] hover:bg-white/10'
+                                "
+                                @click="currentView = v.key"
+                            >
+                                {{ v.label }}
+                            </button>
+                        </div>
+
+                        <!-- Nuevo horario -->
+                        <button
+                            type="button"
+                            class="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-5 text-[14.5px] font-semibold text-[#1E3A5F] shadow-[0_10px_20px_-10px_rgba(0,0,0,0.5)] transition hover:bg-[#EAF0FB]"
+                            @click="openCreateDialog()"
+                        >
+                            <Plus class="size-[17px]" />
+                            Nuevo horario
+                        </button>
+
+                        <!-- Toggle panel -->
+                        <button
+                            type="button"
+                            class="grid size-11 place-items-center rounded-xl border border-white/30 bg-white/15 text-white transition hover:bg-white/25"
+                            aria-label="Mostrar u ocultar el panel"
+                            @click="panelOpen = !panelOpen"
+                        >
+                            <PanelRightClose v-if="panelOpen" class="size-[18px]" />
+                            <PanelRightOpen v-else class="size-[18px]" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calendario + panel -->
+            <div class="flex min-h-0 flex-1 gap-4">
+                <div
+                    class="min-w-0 flex-1 overflow-hidden rounded-[18px] border border-[#D8E2F4] bg-card shadow-[0_10px_24px_-18px_rgba(30,58,95,0.5)] dark:border-border"
+                >
+                    <div
+                        v-if="loadingEvents"
+                        class="h-0.5 animate-pulse bg-gradient-to-r from-[#1E3A5F] via-[#214EA4] to-[#8CB8FF]"
+                    />
+
+                    <!-- ── DÍA / SEMANA ── -->
+                    <div
+                        v-if="currentView !== 'month'"
+                        ref="scroller"
+                        class="relative max-h-[calc(100vh-20rem)] min-h-[420px] overflow-y-auto"
+                    >
+                        <!-- Encabezado (se queda arriba al hacer scroll) -->
+                        <div
+                            class="sticky top-0 z-20 grid border-b border-[#E1E9F7] bg-[#F7F9FD] dark:border-border dark:bg-muted"
+                            :style="gridCols"
+                        >
+                            <div />
+                            <div
+                                v-for="day in columns"
+                                :key="day.toISOString()"
+                                class="flex flex-col items-center justify-center gap-0.5 border-l border-[#EAF0FB] py-3 dark:border-border"
+                                :class="isToday(day) ? 'bg-gradient-to-b from-[#E3EDFF] to-[#EEF4FF] dark:from-[#214EA4]/25 dark:to-[#214EA4]/10' : ''"
+                            >
+                                <span
+                                    class="text-[12.5px] font-medium"
+                                    :class="isToday(day) ? 'font-semibold text-[#214EA4] dark:text-[#8CB8FF]' : 'text-muted-foreground'"
+                                >
+                                    {{ DAYS_LABEL[day.getDay()] }}<template v-if="isToday(day)"> · Hoy</template>
+                                </span>
+                                <span
+                                    class="grid size-[34px] place-items-center rounded-full text-base font-semibold"
+                                    :class="
+                                        isToday(day)
+                                            ? 'bg-gradient-to-br from-[#1E3A5F] to-[#214EA4] text-white shadow-[0_8px_16px_-8px_rgba(33,78,164,0.8)]'
+                                            : ''
+                                    "
+                                >
+                                    {{ day.getDate() }}
+                                </span>
+                                <span
+                                    class="text-[11px]"
+                                    :class="isToday(day) ? 'font-medium text-[#214EA4] dark:text-[#8CB8FF]' : 'text-muted-foreground/80'"
+                                >
+                                    {{ classLabel(eventsByDay(jsDateToDayOfWeek(day)).length) }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Cuerpo -->
+                        <div class="relative grid" :style="gridCols">
+                            <!-- Horas -->
+                            <div class="relative" :style="{ height: `${HOURS.length * HOUR_PX}px` }">
+                                <span
                                     v-for="h in HOURS"
                                     :key="h"
-                                    class="flex items-start justify-end border-b border-r pr-2 text-xs text-muted-foreground"
-                                    style="height: 60px; padding-top: 4px"
+                                    class="absolute right-3 text-xs font-medium text-muted-foreground"
+                                    :class="h === 7 ? 'translate-y-1' : '-translate-y-2'"
+                                    :style="{ top: `${(h - 7) * HOUR_PX}px` }"
                                 >
-                                    {{ String(h).padStart(2,'0') }}:00
-                                </div>
+                                    {{ String(h).padStart(2, '0') }}:00
+                                </span>
+
+                                <span
+                                    v-if="nowVisible && columns.some(isToday)"
+                                    class="absolute right-1.5 z-10 -translate-y-1/2 rounded-full bg-[#E5484D] px-2 py-0.5 text-[11px] font-semibold text-white"
+                                    :style="{ top: `${nowTop}px` }"
+                                >
+                                    {{ nowLabel }}
+                                </span>
                             </div>
 
-                            <!-- Columnas días -->
+                            <!-- Columnas de días -->
                             <div
-                                v-for="(day, di) in weekDays"
-                                :key="di"
-                                class="relative border-r last:border-r-0"
-                                :class="isToday(day) ? 'bg-primary/5' : ''"
+                                v-for="day in columns"
+                                :key="day.toISOString()"
+                                class="relative border-l border-[#EAF0FB] dark:border-border"
+                                :class="isToday(day) ? 'bg-[#214EA4]/[0.05]' : ''"
                                 :style="{ height: `${HOURS.length * HOUR_PX}px` }"
-                                @click.self="openCreateDialog(jsDateToDayOfWeek(day))"
+                                @click.self="openCreateDialog(jsDateToDayOfWeek(day), hourAt($event))"
                             >
-                                <!-- Líneas de hora -->
+                                <!-- Líneas de hora y de media hora -->
                                 <div
                                     v-for="h in HOURS"
                                     :key="h"
-                                    class="absolute w-full border-b border-dashed border-border/40"
+                                    class="pointer-events-none absolute w-full border-t border-[#E4ECF9] dark:border-border/50"
                                     :style="{ top: `${(h - 7) * HOUR_PX}px` }"
+                                />
+                                <div
+                                    v-for="h in HOURS"
+                                    :key="`${h}-half`"
+                                    class="pointer-events-none absolute w-full border-t border-dashed border-[#EEF3FB] dark:border-border/30"
+                                    :style="{ top: `${(h - 7) * HOUR_PX + HOUR_PX / 2}px` }"
                                 />
 
                                 <!-- Línea de ahora -->
                                 <div
-                                    v-if="isToday(day)"
-                                    class="absolute z-10 w-full border-t-2 border-red-500"
-                                    :style="{
-                                        top: `${((today.getHours() - 7) * 60 + today.getMinutes()) / 60 * HOUR_PX}px`
-                                    }"
+                                    v-if="isToday(day) && nowVisible"
+                                    class="pointer-events-none absolute z-[2] h-0.5 w-full bg-[#E5484D]"
+                                    :style="{ top: `${nowTop}px` }"
                                 >
-                                    <div class="absolute -left-1 -top-1.5 h-3 w-3 rounded-full bg-red-500" />
+                                    <span class="absolute -left-[5px] -top-1 size-2.5 rounded-full bg-[#E5484D]" />
                                 </div>
 
                                 <!-- Eventos -->
                                 <div
                                     v-for="ev in eventsByDay(jsDateToDayOfWeek(day))"
                                     :key="ev.id"
-                                    class="absolute left-1 right-1 cursor-pointer overflow-hidden rounded-md px-1.5 py-1 text-white shadow-sm transition-opacity hover:opacity-100 group"
+                                    class="group absolute left-1.5 right-1.5 z-[5] overflow-hidden rounded-[14px] px-3 py-2.5 shadow-[0_12px_22px_-14px_rgba(30,58,95,0.7)] transition hover:-translate-y-px hover:shadow-[0_16px_26px_-14px_rgba(30,58,95,0.8)]"
+                                    :class="tone(ev).card"
                                     :style="eventStyle(ev)"
                                     :title="`${ev.title} — ${ev.teacher} — ${ev.classroom}`"
                                 >
-                                    <div class="truncate text-xs font-semibold leading-tight">{{ ev.title }}</div>
-                                    <div class="truncate text-[10px] opacity-90">{{ ev.teacher }}</div>
-                                    <div class="truncate text-[10px] opacity-80">{{ ev.classroom }}</div>
-                                    <div class="text-[10px] opacity-80">{{ ev.start_time }} - {{ ev.end_time }}</div>
-                                    <!-- Acciones al hacer hover -->
-                                    <div class="absolute right-1 top-1 hidden gap-0.5 group-hover:flex">
+                                    <!-- Bloque de 1 hora o menos -->
+                                    <template v-if="isCompact(ev)">
+                                        <div class="flex items-center gap-2">
+                                            <span class="truncate text-[13.5px] font-semibold leading-tight">{{ ev.title }}</span>
+                                            <span
+                                                v-if="isLive(ev, day)"
+                                                class="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-[#BFE9D3] bg-[#E3F7EC] px-2 py-px text-[10.5px] font-semibold text-[#0E7C4A]"
+                                            >
+                                                <span class="size-1.5 rounded-full bg-[#16A36A]" />En curso
+                                            </span>
+                                        </div>
+                                        <p class="mt-1 truncate text-[11.5px] opacity-90">
+                                            {{ hhmm(ev.start_time) }} – {{ hhmm(ev.end_time) }} · {{ ev.classroom }}
+                                        </p>
+                                    </template>
+
+                                    <!-- Bloque más largo -->
+                                    <template v-else>
+                                        <p class="truncate text-[14.5px] font-semibold leading-tight">{{ ev.title }}</p>
+                                        <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                            <span
+                                                :class="tone(ev).chip"
+                                                class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-xs font-semibold"
+                                            >
+                                                <Clock class="size-3" />
+                                                {{ hhmm(ev.start_time) }} – {{ hhmm(ev.end_time) }}
+                                            </span>
+                                            <span
+                                                v-if="isLive(ev, day)"
+                                                class="inline-flex items-center gap-1 rounded-full border border-[#BFE9D3] bg-[#E3F7EC] px-2 py-0.5 text-[10.5px] font-semibold text-[#0E7C4A]"
+                                            >
+                                                <span class="size-1.5 rounded-full bg-[#16A36A]" />En curso
+                                            </span>
+                                        </div>
+                                        <p class="mt-2 flex items-start gap-1.5 text-xs leading-snug opacity-95">
+                                            <User class="mt-px size-3 shrink-0" />
+                                            <span>{{ ev.teacher }}</span>
+                                        </p>
+                                        <p class="mt-1 flex items-start gap-1.5 text-xs leading-snug opacity-95">
+                                            <MapPin class="mt-px size-3 shrink-0" />
+                                            <span>{{ ev.classroom }}</span>
+                                        </p>
+                                    </template>
+
+                                    <!-- Acciones al pasar el mouse -->
+                                    <div class="absolute right-1.5 top-1.5 hidden gap-1 group-hover:flex">
                                         <button
-                                            class="rounded bg-white/20 p-0.5 hover:bg-white/40"
+                                            type="button"
+                                            :class="tone(ev).tool"
+                                            class="grid size-6 place-items-center rounded-md transition"
                                             title="Asistencia"
                                             @click.stop="router.visit(`/sections/${ev.section_id}/attendance`)"
                                         >
-                                            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
-                                            </svg>
+                                            <ClipboardCheck class="size-3.5" />
                                         </button>
                                         <button
-                                            class="rounded bg-white/20 p-0.5 hover:bg-blue-600/60"
+                                            type="button"
+                                            :class="tone(ev).tool"
+                                            class="grid size-6 place-items-center rounded-md transition"
                                             title="Editar"
                                             @click.stop="openEditDialog(ev)"
                                         >
-                                            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"/>
-                                            </svg>
+                                            <Pencil class="size-3.5" />
                                         </button>
                                         <button
-                                            class="rounded bg-white/20 p-0.5 hover:bg-red-600/60"
+                                            type="button"
+                                            :class="tone(ev).tool"
+                                            class="grid size-6 place-items-center rounded-md transition hover:!bg-[#E5484D] hover:!text-white"
                                             title="Eliminar"
                                             @click.stop="deleteSchedule(ev.id)"
                                         >
-                                            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M6 18L18 6M6 6l12 12"/>
-                                            </svg>
+                                            <Trash2 class="size-3.5" />
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- ── VISTA DÍA ── -->
-                <div v-else-if="currentView === 'day'" class="flex flex-1 flex-col overflow-hidden">
-                    <div class="border-b px-6 py-2 text-center text-sm font-medium">
-                        {{ DAYS_FULL[currentDate.getDay()] }}, {{ currentDate.getDate() }} de
-                        {{ MONTHS[currentDate.getMonth()] }} {{ currentDate.getFullYear() }}
-                    </div>
-                    <div class="flex-1 overflow-hidden">
-                        <div class="relative grid" style="grid-template-columns: 64px 1fr">
-                            <div>
-                                <div
-                                    v-for="h in HOURS" :key="h"
-                                    class="flex items-start justify-end border-b border-r pr-2 text-xs text-muted-foreground"
-                                    style="height:60px;padding-top:4px"
-                                >
-                                    {{ String(h).padStart(2,'0') }}:00
-                                </div>
+                    <!-- ── MES ── -->
+                    <div v-else class="p-4">
+                        <div
+                            class="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-[#E1E9F7] bg-[#E1E9F7] dark:border-border dark:bg-border"
+                        >
+                            <div
+                                v-for="d in ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']"
+                                :key="d"
+                                class="bg-[#F7F9FD] py-2.5 text-center text-xs font-semibold text-muted-foreground dark:bg-muted"
+                            >
+                                {{ d }}
                             </div>
                             <div
-                                class="relative"
-                                :style="{ height: `${HOURS.length * HOUR_PX}px` }"
-                                @click.self="openCreateDialog(jsDateToDayOfWeek(currentDate))"
+                                v-for="(day, i) in monthDays"
+                                :key="i"
+                                class="min-h-[108px] cursor-pointer bg-card p-1.5 transition hover:bg-[#F4F7FD] dark:hover:bg-muted/40"
+                                :class="day && isToday(day) ? '!bg-[#EEF4FF] dark:!bg-[#214EA4]/15' : ''"
+                                @click="day && openCreateDialog(jsDateToDayOfWeek(day))"
                             >
-                                <div
-                                    v-for="h in HOURS" :key="h"
-                                    class="absolute w-full border-b border-dashed border-border/40"
-                                    :style="{ top: `${(h-7)*HOUR_PX}px` }"
-                                />
-                                <div
-                                    v-if="isToday(currentDate)"
-                                    class="absolute z-10 w-full border-t-2 border-red-500"
-                                    :style="{ top: `${((today.getHours()-7)*60+today.getMinutes())/60*HOUR_PX}px` }"
-                                >
-                                    <div class="absolute -left-1 -top-1.5 h-3 w-3 rounded-full bg-red-500" />
-                                </div>
-                                <div
-                                    v-for="ev in eventsByDay(jsDateToDayOfWeek(currentDate))"
-                                    :key="ev.id"
-                                    class="absolute left-2 right-2 cursor-pointer overflow-hidden rounded-md px-2 py-1 text-white shadow-sm"
-                                    :style="eventStyle(ev)"
-                                >
-                                    <div class="text-sm font-semibold">{{ ev.title }}</div>
-                                    <div class="text-xs opacity-90">{{ ev.teacher }}</div>
-                                    <div class="text-xs opacity-80">{{ ev.classroom }} · {{ ev.start_time }} - {{ ev.end_time }}</div>
-                                </div>
+                                <template v-if="day">
+                                    <span
+                                        class="mb-1 grid size-6 place-items-center rounded-full text-xs font-medium"
+                                        :class="
+                                            isToday(day)
+                                                ? 'bg-gradient-to-br from-[#1E3A5F] to-[#214EA4] font-bold text-white'
+                                                : 'text-muted-foreground'
+                                        "
+                                    >
+                                        {{ day.getDate() }}
+                                    </span>
+                                    <div
+                                        v-for="ev in eventsForMonthDay(day).slice(0, 3)"
+                                        :key="ev.id"
+                                        :class="tone(ev).pill"
+                                        class="mb-0.5 truncate rounded-md px-1.5 py-0.5 text-[10.5px] font-medium"
+                                    >
+                                        {{ ev.title }}
+                                    </div>
+                                    <p
+                                        v-if="eventsForMonthDay(day).length > 3"
+                                        class="px-1 text-[10.5px] font-medium text-[#214EA4] dark:text-[#8CB8FF]"
+                                    >
+                                        +{{ eventsForMonthDay(day).length - 3 }} más
+                                    </p>
+                                </template>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ── VISTA MES ── -->
-                <div v-else class="flex flex-1 flex-col overflow-auto p-4">
-                    <div class="grid grid-cols-7 gap-px rounded-lg border bg-border">
-                        <div
-                            v-for="d in ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']"
-                            :key="d"
-                            class="bg-background py-2 text-center text-xs font-medium text-muted-foreground"
-                        >
-                            {{ d }}
-                        </div>
-                        <div
-                            v-for="(day, i) in monthDays"
-                            :key="i"
-                            class="min-h-[100px] bg-background p-1"
-                            :class="day && isToday(day) ? 'bg-primary/5' : ''"
-                            @click="day && openCreateDialog(jsDateToDayOfWeek(day))"
-                        >
-                            <template v-if="day">
-                                <div
-                                    class="mb-1 flex h-6 w-6 items-center justify-center rounded-full text-xs"
-                                    :class="isToday(day) ? 'bg-primary text-primary-foreground font-bold' : 'text-muted-foreground'"
-                                >
-                                    {{ day.getDate() }}
-                                </div>
-                                <div
-                                    v-for="ev in eventsForMonthDay(day)"
-                                    :key="ev.id"
-                                    class="mb-0.5 truncate rounded px-1 text-[10px] text-white"
-                                    :style="{ backgroundColor: ev.color }"
-                                >
-                                    {{ ev.title }}
-                                </div>
-                            </template>
                         </div>
                     </div>
                 </div>
 
                 <!-- ── PANEL DERECHO ── -->
-                <aside
-                    v-if="panelOpen"
-                    class="flex w-72 shrink-0 flex-col gap-3 overflow-y-auto border-l p-4"
-                >
+                <aside v-if="panelOpen" class="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto">
                     <!-- Conflictos -->
-                    <Card>
-                        <CardHeader class="pb-2 pt-4">
-                            <CardTitle class="flex items-center gap-2 text-sm">
-                                <AlertTriangle class="h-4 w-4 text-destructive" />
-                                Conflictos
-                                <Badge v-if="conflicts.length" variant="destructive" class="ml-auto">
-                                    {{ conflicts.length }}
-                                </Badge>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent class="space-y-2 pb-4">
-                            <p v-if="conflicts.length === 0" class="text-xs text-muted-foreground">
+                    <div
+                        class="rounded-[18px] border border-[#D8E2F4] bg-card p-5 shadow-[0_10px_24px_-18px_rgba(30,58,95,0.5)] dark:border-border"
+                    >
+                        <div class="flex items-center gap-3">
+                            <span
+                                class="grid size-[38px] shrink-0 place-items-center rounded-[11px] bg-gradient-to-br"
+                                :class="conflicts.length ? 'from-[#E5484D] to-[#F07A7E]' : 'from-[#16A36A] to-[#34C58A]'"
+                            >
+                                <AlertTriangle v-if="conflicts.length" class="size-[19px] text-white" />
+                                <CheckCircle2 v-else class="size-[19px] text-white" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <h2 class="text-[15px] font-semibold">Conflictos</h2>
+                                <p class="text-xs text-muted-foreground">
+                                    {{ conflicts.length ? 'Requieren revisión' : 'Todo en orden' }}
+                                </p>
+                            </div>
+                            <span
+                                v-if="conflicts.length"
+                                class="rounded-full bg-destructive px-2.5 py-0.5 text-xs font-semibold text-white"
+                            >
+                                {{ conflicts.length }}
+                            </span>
+                        </div>
+
+                        <div class="mt-3 space-y-2">
+                            <p
+                                v-if="conflicts.length === 0"
+                                class="rounded-xl bg-[#E3F7EC] px-3 py-2.5 text-xs text-[#0E7C4A] dark:bg-emerald-950/40 dark:text-emerald-400"
+                            >
                                 Sin conflictos detectados.
                             </p>
                             <div
                                 v-for="(c, i) in conflicts"
                                 :key="i"
-                                class="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive"
+                                class="rounded-xl border-l-4 border-destructive bg-destructive/10 px-3 py-2.5 text-xs"
                             >
-                                <div class="font-medium">{{ DAYS_FULL[c.day] }} {{ c.time }}</div>
-                                <div class="mt-0.5 opacity-80">{{ c.message }}</div>
+                                <p class="font-semibold text-destructive">{{ DAYS_FULL[c.day] }} {{ c.time }}</p>
+                                <p class="mt-0.5 text-muted-foreground">{{ c.message }}</p>
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
 
                     <!-- Materias sin asignar -->
-                    <Card>
-                        <CardHeader class="pb-2 pt-4">
-                            <CardTitle class="flex items-center gap-2 text-sm">
-                                <BookOpen class="h-4 w-4 text-muted-foreground" />
-                                Sin asignar
-                                <Badge v-if="unassigned.length" variant="secondary" class="ml-auto">
-                                    {{ unassigned.length }}
-                                </Badge>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent class="space-y-1.5 pb-4">
-                            <p v-if="unassigned.length === 0" class="text-xs text-muted-foreground">
+                    <div
+                        class="rounded-[18px] border border-[#D8E2F4] bg-card p-5 shadow-[0_10px_24px_-18px_rgba(30,58,95,0.5)] dark:border-border"
+                    >
+                        <div class="flex items-center gap-3">
+                            <span class="grid size-[38px] shrink-0 place-items-center rounded-[11px] bg-gradient-to-br from-[#1E3A5F] to-[#214EA4]">
+                                <BookOpen class="size-[19px] text-white" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <h2 class="text-[15px] font-semibold">Sin asignar</h2>
+                                <p class="text-xs text-muted-foreground">Materias sin horario</p>
+                            </div>
+                            <span
+                                v-if="unassigned.length"
+                                class="rounded-full bg-[#E8EEFB] px-2.5 py-0.5 text-xs font-semibold text-[#214EA4] dark:bg-[#214EA4]/25 dark:text-[#8CB8FF]"
+                            >
+                                {{ unassigned.length }}
+                            </span>
+                        </div>
+
+                        <div class="mt-3 space-y-2">
+                            <p
+                                v-if="unassigned.length === 0"
+                                class="rounded-xl bg-[#E3F7EC] px-3 py-2.5 text-xs text-[#0E7C4A] dark:bg-emerald-950/40 dark:text-emerald-400"
+                            >
                                 Todas las materias tienen sección asignada.
                             </p>
-                            <div
+                            <button
                                 v-for="u in unassigned"
                                 :key="u.curricula_id"
-                                class="flex cursor-pointer items-center justify-between rounded-md border px-2 py-1.5 text-xs hover:bg-accent"
+                                type="button"
+                                class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-[#E1E9F7] bg-[#F4F7FD] px-3 py-2.5 text-left text-xs transition hover:border-[#214EA4]/40 hover:bg-[#E8EEFB] dark:border-border dark:bg-muted/40"
                                 @click="openCreateDialog(); form.curricula_id = String(u.curricula_id)"
                             >
                                 <span class="font-medium">{{ u.subject }}</span>
-                                <span v-if="u.hours" class="text-muted-foreground">{{ u.hours }}h</span>
-                            </div>
-                        </CardContent>
-                    </Card>
+                                <span v-if="u.hours" class="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[#214EA4] dark:bg-background">
+                                    {{ u.hours }}h
+                                </span>
+                            </button>
+                        </div>
+                    </div>
                 </aside>
             </div>
         </div>
 
-        <!-- ── DIALOG CREAR HORARIO ── -->
+        <!-- ── DIALOG CREAR / EDITAR HORARIO ── -->
         <Dialog v-model:open="createDialogOpen">
-            <DialogContent class="w-[90vw] max-w-2xl max-h-[85vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>{{ dialogMode === 'edit' ? 'Editar horario' : 'Nuevo horario' }}</DialogTitle>
-                    <DialogDescription>
-                        {{ dialogMode === 'edit' ? 'Modifica el bloque horario.' : 'Crea una sección y asígnale un bloque horario.' }}
-                    </DialogDescription>
-                </DialogHeader>
+            <DialogContent
+                class="flex max-h-[90vh] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-[20px] p-0 sm:max-w-3xl [&>button]:text-white [&>button]:opacity-80 [&>button]:hover:opacity-100"
+            >
+                <!-- Encabezado -->
+                <div class="relative shrink-0 overflow-hidden bg-[linear-gradient(120deg,#1E3A5F,#214EA4)] px-6 py-4 text-white">
+                    <div class="pointer-events-none absolute -right-10 -top-16 h-[150px] w-[150px] rotate-45 bg-[#2F63C9]/80"></div>
+                    <div class="pointer-events-none absolute -bottom-16 -left-8 h-[110px] w-[110px] rotate-45 bg-[#2F63C9]/55"></div>
 
-                <div class="grid grid-cols-2 gap-4 py-2">
-                    <!-- Materia -->
-                    <div class="col-span-2 space-y-1">
-                        <Label>Materia <span class="text-destructive">*</span></Label>
-                        <Select v-model="form.curricula_id">
-                            <SelectTrigger><SelectValue placeholder="Selecciona materia" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem
-                                    v-for="c in props.curricula"
-                                    :key="c.id"
-                                    :value="String(c.id)"
-                                >
-                                    {{ c.subject }} — {{ c.semester }} ({{ c.career }})
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    <DialogHeader class="relative flex-row items-center gap-3.5 space-y-0 pr-8 text-left">
+                        <span class="grid size-[46px] shrink-0 place-items-center rounded-2xl bg-white/20">
+                            <Pencil v-if="dialogMode === 'edit'" class="size-[22px]" />
+                            <CalendarPlus v-else class="size-[22px]" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <DialogTitle class="acadex-title text-[22px] leading-tight text-white">
+                                {{ dialogMode === 'edit' ? 'Editar horario' : 'Nuevo horario' }}
+                            </DialogTitle>
+                            <DialogDescription class="mt-0.5 text-[13px] text-[#C9DAF7]">
+                                {{ dialogMode === 'edit' ? 'Modifica el bloque horario.' : 'Crea una sección y asígnale un bloque horario.' }}
+                            </DialogDescription>
+                        </div>
+                        <span
+                            v-if="selectedPeriodName"
+                            class="hidden shrink-0 items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1 text-xs font-medium sm:inline-flex"
+                        >
+                            <CalendarDays class="size-3.5" />
+                            {{ selectedPeriodName }}
+                        </span>
+                    </DialogHeader>
+                </div>
 
-                    <!-- Docente -->
-                    <div class="space-y-1">
-                        <Label>Docente <span class="text-destructive">*</span></Label>
-                        <Select v-model="form.teacher_id">
-                            <SelectTrigger><SelectValue placeholder="Selecciona docente" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem
-                                    v-for="t in props.teachers"
-                                    :key="t.id"
-                                    :value="String(t.id)"
-                                >
-                                    {{ t.full_name }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                <!-- Formulario (si la pantalla es muy baja, solo esta parte hace scroll) -->
+                <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                    <div class="grid grid-cols-6 gap-x-4 gap-y-3.5">
+                        <!-- Materia -->
+                        <div class="col-span-6 grid gap-1.5">
+                            <Label :class="labelClass">Materia <span class="text-destructive">*</span></Label>
+                            <Select v-model="form.curricula_id">
+                                <SelectTrigger :class="fieldClass"><SelectValue placeholder="Selecciona materia" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="c in props.curricula"
+                                        :key="c.id"
+                                        :value="String(c.id)"
+                                    >
+                                        {{ c.subject }} — {{ c.semester }} ({{ c.career }})
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
 
-                    <!-- Aula -->
-                    <div class="space-y-1">
-                        <Label>Aula <span class="text-destructive">*</span></Label>
-                        <Select v-model="form.classroom_id">
-                            <SelectTrigger><SelectValue placeholder="Selecciona aula" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem
-                                    v-for="cl in props.classrooms"
-                                    :key="cl.id"
-                                    :value="String(cl.id)"
-                                >
-                                    {{ cl.name }} ({{ cl.code }}) — Cap. {{ cl.capacity }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                        <!-- Docente -->
+                        <div class="col-span-6 grid gap-1.5 sm:col-span-3">
+                            <Label :class="labelClass">Docente <span class="text-destructive">*</span></Label>
+                            <Select v-model="form.teacher_id">
+                                <SelectTrigger :class="fieldClass"><SelectValue placeholder="Selecciona docente" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="t in props.teachers"
+                                        :key="t.id"
+                                        :value="String(t.id)"
+                                    >
+                                        {{ t.full_name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
 
-                    <!-- Nombre sección y cupo -->
-                    <div class="space-y-1">
-                        <Label>Nombre sección</Label>
-                        <Input v-model="form.section_name" placeholder="Sección A" />
-                    </div>
-                    <div class="space-y-1">
-                        <Label>Cupo</Label>
-                        <Input v-model="form.quota" type="number" min="1" max="500" />
-                    </div>
+                        <!-- Aula -->
+                        <div class="col-span-6 grid gap-1.5 sm:col-span-3">
+                            <Label :class="labelClass">Aula <span class="text-destructive">*</span></Label>
+                            <Select v-model="form.classroom_id">
+                                <SelectTrigger :class="fieldClass"><SelectValue placeholder="Selecciona aula" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="cl in props.classrooms"
+                                        :key="cl.id"
+                                        :value="String(cl.id)"
+                                    >
+                                        {{ cl.name }} ({{ cl.code }}) — Cap. {{ cl.capacity }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
 
-                    <!-- Día -->
-                    <div class="space-y-1">
-                        <Label>Día <span class="text-destructive">*</span></Label>
-                        <Select v-model="form.day_of_week">
-                            <SelectTrigger><SelectValue placeholder="Día de la semana" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem v-for="(d, i) in DAYS_FULL" :key="i" :value="String(i)">
-                                    {{ d }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                        <!-- Nombre sección y cupo -->
+                        <div class="col-span-6 grid gap-1.5 sm:col-span-4">
+                            <Label :class="labelClass">Nombre sección</Label>
+                            <Input v-model="form.section_name" placeholder="Sección A" :class="fieldClass" />
+                        </div>
+                        <div class="col-span-6 grid gap-1.5 sm:col-span-2">
+                            <Label :class="labelClass">Cupo</Label>
+                            <Input v-model="form.quota" type="number" min="1" max="500" :class="fieldClass" />
+                        </div>
 
-                    <!-- Horas -->
-                    <div class="space-y-1">
-                        <Label>Hora inicio <span class="text-destructive">*</span></Label>
-                        <Input v-model="form.start_time" type="time" />
-                    </div>
-                    <div class="space-y-1">
-                        <Label>Hora fin <span class="text-destructive">*</span></Label>
-                        <Input v-model="form.end_time" type="time" />
-                    </div>
+                        <!-- Día y horas -->
+                        <div class="col-span-6 grid gap-1.5 sm:col-span-2">
+                            <Label :class="labelClass">Día <span class="text-destructive">*</span></Label>
+                            <Select v-model="form.day_of_week">
+                                <SelectTrigger :class="fieldClass"><SelectValue placeholder="Día de la semana" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem v-for="(d, i) in DAYS_FULL" :key="i" :value="String(i)">
+                                        {{ d }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div class="col-span-3 grid gap-1.5 sm:col-span-2">
+                            <Label :class="labelClass">Hora inicio <span class="text-destructive">*</span></Label>
+                            <Input v-model="form.start_time" type="time" :class="fieldClass" />
+                        </div>
+                        <div class="col-span-3 grid gap-1.5 sm:col-span-2">
+                            <Label :class="labelClass">Hora fin <span class="text-destructive">*</span></Label>
+                            <Input v-model="form.end_time" type="time" :class="fieldClass" />
+                        </div>
 
-                    <!-- Recurrente -->
-                    <div class="col-span-2 flex items-center gap-3">
-                        <Switch v-model="form.is_recurring" />
-                        <Label>Horario recurrente (se repite cada semana)</Label>
-                    </div>
+                        <!-- Recurrencia -->
+                        <div
+                            class="col-span-6 flex flex-wrap items-center justify-between gap-4 rounded-[14px] border border-[#E1E9F7] bg-[#F4F7FD] px-4 py-3 dark:border-border dark:bg-muted/40"
+                        >
+                            <div class="flex items-center gap-3">
+                                <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#214EA4] to-[#3F7BE0] text-white">
+                                    <Repeat class="size-[18px]" />
+                                </span>
+                                <div>
+                                    <Label for="schedule-recurring" :class="labelClass">Horario recurrente</Label>
+                                    <p class="text-xs text-muted-foreground">Se repite cada semana</p>
+                                </div>
+                                <Switch id="schedule-recurring" v-model="form.is_recurring" class="ml-2" />
+                            </div>
 
-                    <!-- Fecha específica si no es recurrente -->
-                    <div v-if="!form.is_recurring" class="space-y-1">
-                        <Label>Fecha específica <span class="text-destructive">*</span></Label>
-                        <Input v-model="form.specific_date" type="date" />
-                    </div>
-
-                    <!-- Fecha fin recurrencia -->
-                    <div v-if="form.is_recurring" class="space-y-1">
-                        <Label>Fecha fin (opcional)</Label>
-                        <Input v-model="form.recurrence_end" type="date" />
+                            <div class="grid w-full gap-1.5 sm:w-52">
+                                <Label :class="labelClass">
+                                    {{ form.is_recurring ? 'Fecha fin' : 'Fecha específica' }}
+                                    <span v-if="!form.is_recurring" class="text-destructive">*</span>
+                                    <span v-else class="font-normal text-[#8A97AB]">(opcional)</span>
+                                </Label>
+                                <Input v-if="form.is_recurring" v-model="form.recurrence_end" type="date" :class="fieldClass" />
+                                <Input v-else v-model="form.specific_date" type="date" :class="fieldClass" />
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <DialogFooter>
-                    <Button variant="outline" :disabled="creating" @click="createDialogOpen = false">
+                <!-- Acciones (siempre visibles) -->
+                <DialogFooter class="shrink-0 gap-2 border-t border-[#E1E9F7] bg-[#F7F9FD] px-6 py-3 dark:border-border dark:bg-muted/30">
+                    <Button variant="outline" class="rounded-xl" :disabled="creating" @click="createDialogOpen = false">
                         Cancelar
                     </Button>
-                    <Button :disabled="creating" @click="handleCreate">
+                    <Button
+                        class="rounded-xl bg-gradient-to-r from-[#1E3A5F] to-[#214EA4] text-white shadow-[0_10px_20px_-10px_rgba(33,78,164,0.8)] hover:brightness-110"
+                        :disabled="creating"
+                        @click="handleCreate"
+                    >
                         {{ creating ? 'Guardando...' : dialogMode === 'edit' ? 'Guardar cambios' : 'Crear horario' }}
                     </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
-
     </AppLayout>
 </template>
+<style scoped>
+    .acadex-title {
+        font-family: 'Fraunces', serif;
+        font-weight: 600;
+    }
+</style>

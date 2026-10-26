@@ -20,9 +20,6 @@ return new class extends Migration
                 ->constrained('careers')
                 ->restrictOnDelete();
 
-            // Espejo de los campos de Person — se copian tal cual al
-            // aprobar (Punto 5), por eso viven aquí duplicados a propósito
-            // y no como referencia a Person (que todavía no existe).
             $table->string('first_name')->nullable();
             $table->string('second_name')->nullable();
             $table->string('first_surname')->nullable();
@@ -45,7 +42,6 @@ return new class extends Migration
             $table->unsignedBigInteger('provinces_id')->nullable();
             $table->unsignedBigInteger('cities_id')->nullable();
 
-            // Punto 1 y 4: estados del Kanban + 'borrador' antes de enviar.
             $table->enum('status', [
                 'borrador', 'recibida', 'en_revision', 'aprobada', 'rechazada', 'abandonada',
             ])->default('borrador');

@@ -3,9 +3,11 @@
 namespace Modules\Academic\Services;
 
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Modules\Academic\Imports\BulkEnrollmentImport;
 use Modules\Academic\Models\Enrollment;
 use Modules\Academic\Models\EnrollmentItem;
+use Modules\Academic\Models\Section;
 use Modules\Institucion\Models\Curriculum;
 use Modules\People\Models\Student;
 use Maatwebsite\Excel\Facades\Excel;
@@ -25,26 +27,31 @@ class EnrollmentService
 
         $this->validatePrerequisites($data['student_id'], $curriculaIds);
 
-        $enrollment = Enrollment::create([
-            'student_id'         => $data['student_id'],
-            'career_id'          => $data['career_id'],
-            'semester_id'        => $data['semester_id'],
-            'academic_period_id' => $data['academic_period_id'],
-            'enrollment_date'    => $data['enrollment_date'],
-            'type'               => $data['type'],
-            'status'             => $data['status'],
-        ]);
+        $sectionsByCurriculum = $this->resolveSections($curriculaIds, (int) $data['academic_period_id']);
 
-        foreach ($curriculaIds as $curriculumId) {
-            EnrollmentItem::create([
-                'enrollment_id' => $enrollment->id,
-                'curricula_id'  => $curriculumId,
-                'status'        => 'en_curso',
-                'active'        => true,
+        return DB::transaction(function () use ($data, $curriculaIds, $sectionsByCurriculum) {
+            $enrollment = Enrollment::create([
+                'student_id'         => $data['student_id'],
+                'career_id'          => $data['career_id'],
+                'semester_id'        => $data['semester_id'],
+                'academic_period_id' => $data['academic_period_id'],
+                'enrollment_date'    => $data['enrollment_date'],
+                'type'               => $data['type'],
+                'status'             => $data['status'],
             ]);
-        }
 
-        return $enrollment;
+            foreach ($curriculaIds as $curriculumId) {
+                EnrollmentItem::create([
+                    'enrollment_id' => $enrollment->id,
+                    'curricula_id'  => $curriculumId,
+                    'section_id'    => $sectionsByCurriculum[$curriculumId],
+                    'status'        => 'en_curso',
+                    'active'        => true,
+                ]);
+            }
+
+            return $enrollment;
+        });
     }
 
     /**
@@ -356,6 +363,50 @@ class EnrollmentService
     public function validatePrerequisitesPublic(int $studentId, array $curriculaIds): void
     {
         $this->validatePrerequisites($studentId, $curriculaIds);
+    }
+
+    /**
+     * Un solo paralelo activo por materia y periodo (decisión actual). Si
+     * alguna materia no tiene paralelo, se rechaza TODA la matrícula con un
+     * mensaje claro, en vez de crear ítems sin section_id que el LMS no ubica.
+     *
+     * @return array<int, int>  curricula_id => section_id
+     */
+    private function resolveSections(array $curriculaIds, int $academicPeriodId): array
+    {
+        $sections = Section::whereIn('curricula_id', $curriculaIds)
+            ->where('academic_period_id', $academicPeriodId)
+            ->where('active', true)
+            ->orderBy('id')
+            ->get()
+            ->groupBy('curricula_id');
+
+        $resolved = [];
+        $missing  = [];
+
+        foreach ($curriculaIds as $curriculumId) {
+            $section = $sections->get($curriculumId)?->first();
+
+            if ($section) {
+                $resolved[$curriculumId] = $section->id;
+            } else {
+                $missing[] = $curriculumId;
+            }
+        }
+
+        if (! empty($missing)) {
+            $names = Curriculum::whereIn('id', $missing)
+                ->with('subject')
+                ->get()
+                ->pluck('subject.name')
+                ->join(', ');
+
+            throw new \DomainException(
+                "No hay un paralelo activo en este período para: {$names}. Créalo antes de matricular."
+            );
+        }
+
+        return $resolved;
     }
     
 }

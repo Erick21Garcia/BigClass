@@ -13,7 +13,6 @@ use Modules\LMS\Http\Controllers\TeacherDashboardController;
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    // --- Aula Virtual (VirtualCourse) — Punto 1 ---
     Route::post('/lms/sections/{section}/virtual-course', [VirtualCourseController::class, 'store'])
         ->name('lms.virtual-courses.store');
 
@@ -26,7 +25,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/lms/virtual-courses/{virtualCourse}/unpublish', [VirtualCourseController::class, 'unpublish'])
         ->name('lms.virtual-courses.unpublish');
 
-    // --- Unidades (Unit) — Punto 3 ---
     Route::post('/lms/virtual-courses/{virtualCourse}/units', [UnitController::class, 'store'])
         ->name('lms.units.store');
 
@@ -39,14 +37,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/lms/units/{unit}', [UnitController::class, 'destroy'])
         ->name('lms.units.destroy');
 
-    // --- Materiales (Resource) — Punto 4 ---
     Route::post('/lms/units/{unit}/resources', [ResourceController::class, 'store'])
         ->name('lms.resources.store');
 
     Route::delete('/lms/resources/{resource}', [ResourceController::class, 'destroy'])
         ->name('lms.resources.destroy');
 
-    // --- Tareas (Assignment) — Punto 5 ---
     Route::post('/lms/units/{unit}/assignments', [AssignmentController::class, 'store'])
         ->name('lms.assignments.store');
 
@@ -65,7 +61,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/lms/submissions/{submission}/calificar', [AssignmentController::class, 'gradeForm'])
         ->name('lms.submissions.grade-form');
 
-    // --- Cuestionarios (Quiz) — Punto 6 ---
     Route::post('/lms/units/{unit}/quizzes', [QuizController::class, 'store'])
         ->name('lms.quizzes.store');
 
@@ -99,14 +94,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/lms/quiz-attempts/{attempt}/calificar', [QuizAttemptController::class, 'gradeForm'])
         ->name('lms.quiz-attempts.grade-form');
 
-    // --- Progreso (ResourceView) — Punto 9 ---
     Route::post('/lms/resources/{resource}/mark-viewed', [ProgressController::class, 'markViewed'])
         ->name('lms.resources.mark-viewed');
 
     Route::get('/lms/virtual-courses/{virtualCourse}/progress', [ProgressController::class, 'show'])
         ->name('lms.virtual-courses.progress');
 
-    // --- Dashboard de estudiante (Mis materias) ---
     Route::get('/lms/mis-materias', [StudentDashboardController::class, 'index'])
         ->name('lms.student.index');
 
@@ -119,7 +112,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/lms/quizzes/{quiz}/resolver', [StudentDashboardController::class, 'quiz'])
         ->name('lms.student.quiz');
 
-    // --- Dashboard de docente ---
     Route::get('/lms/mis-materias-docente', [TeacherDashboardController::class, 'index'])
         ->name('lms.teacher.index');
 
@@ -130,10 +122,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('lms.teacher.manage');
 });
 
-// Ruta firmada — fuera del grupo 'auth' porque la validación de acceso
-// la hace la firma de la URL (Resource::downloadUrl()), no el middleware
-// de sesión. Así funciona también si el link se comparte/abre en pestaña
-// nueva sin depender de la cookie de sesión.
 Route::get('/lms/resources/{resource}/download', [ResourceController::class, 'download'])
     ->name('lms.resources.download')
     ->middleware('signed');

@@ -122,7 +122,7 @@ class QuizAttemptService
     }
 
     /**
-     * Decisión del Punto 6: con múltiples intentos, se sincroniza a Grade
+     * Con múltiples intentos, se sincroniza a Grade
      * el MEJOR intento (final_score más alto) entre todos los ya
      * calificados ('graded') del estudiante para este quiz.
      */

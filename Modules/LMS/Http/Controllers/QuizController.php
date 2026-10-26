@@ -53,7 +53,7 @@ class QuizController extends Controller
     }
 
     /**
-     * Editor de cuestionario — Punto 2 del backlog docente. Pantalla
+     * Editor de cuestionario. Pantalla
      * dedicada aparte (no inline), por la densidad de armar preguntas.
      */
     public function edit(Quiz $quiz): \Inertia\Response

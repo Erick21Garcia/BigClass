@@ -13,7 +13,7 @@ class ProcessAdmissionsLifecycleCommand extends Command
 {
     protected $signature = 'admissions:process-lifecycle';
 
-    protected $description = 'Envía recordatorios, marca postulaciones abandonadas, y purga las vencidas (Punto 6).';
+    protected $description = 'Envía recordatorios, marca postulaciones abandonadas, y purga las vencidas.';
 
     private const REMINDER_LEAD_DAYS = 5;
     private const ABANDONABLE_STATUSES = ['borrador', 'recibida', 'en_revision'];

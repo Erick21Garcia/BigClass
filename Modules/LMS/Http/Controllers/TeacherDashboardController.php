@@ -24,7 +24,7 @@ class TeacherDashboardController extends Controller
     ) {}
 
     /**
-     * "Mis materias" del docente — Punto 1 del backlog docente.
+     * "Mis materias" del docente.
      */
     public function index(Request $request): Response
     {
@@ -50,7 +50,6 @@ class TeacherDashboardController extends Controller
                 'has_virtual_course'=> (bool) $virtualCourse,
                 'is_published'      => (bool) $virtualCourse?->is_published,
                 'students_count'    => $studentsCount,
-                // Punto 1: contador combinado, solo si ya existe VirtualCourse.
                 'pending_count'     => $virtualCourse
                     ? $this->progressService->pendingGradingCount($virtualCourse)
                     : 0,
@@ -63,7 +62,7 @@ class TeacherDashboardController extends Controller
     }
 
     /**
-     * Matriz de calificación — Punto 3 del backlog docente. Filas =
+     * Matriz de calificación. Filas =
      * estudiantes, columnas = cada tarea/cuestionario de la materia,
      * con la nota real (no solo el estado) donde ya esté calificada.
      */
@@ -155,7 +154,7 @@ class TeacherDashboardController extends Controller
     }
 
     /**
-     * "Gestionar materia" — Punto 2 del backlog docente. Acordeón editable
+     * "Gestionar materia". Acordeón editable
      * con Unidades + sus ítems, para agregar materiales/tareas/cuestionarios.
      */
     public function manage(Request $request, VirtualCourse $virtualCourse): Response

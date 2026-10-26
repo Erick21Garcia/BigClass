@@ -1,7 +1,20 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { Head, router } from '@inertiajs/vue3';
+import { useLmsBanner } from '@/composables/useLmsBanner';
 import axios from 'axios';
+import {
+    ArrowRight,
+    BookOpen,
+    ChevronDown,
+    ClipboardList,
+    FileText,
+    HelpCircle,
+    Lock,
+} from 'lucide-vue-next';
+import { computed, ref, type Component } from 'vue';
 import StudentLmsLayout from '@/layouts/StudentLmsLayout.vue';
+
+defineOptions({ layout: StudentLmsLayout });
 
 interface Subject {
     section_id: number;
@@ -63,7 +76,7 @@ async function selectSubject(index: number) {
             `/lms/mis-materias/${subject.virtual_course_id}`,
         );
         courseDetail.value = data;
-        // Primera unidad abierta por defecto, igual que el boceto aprobado.
+
         openUnitIds.value = new Set(data.units.length ? [data.units[0].id] : []);
     } finally {
         loadingDetail.value = false;
@@ -79,11 +92,9 @@ function toggleUnit(unitId: number) {
 async function openResource(item: UnitItem) {
     if (!item.download_url) return;
 
-    // Se marca como leído (Punto de progreso) y se abre el archivo a la vez.
     axios.post(`/lms/resources/${item.id}/mark-viewed`).catch(() => {});
     window.open(item.download_url, '_blank');
 
-    // Refleja el cambio de inmediato en la UI sin esperar recargar.
     if (courseDetail.value) {
         const unit = courseDetail.value.units.find((u) =>
             u.items.some((i) => i.type === 'resource' && i.id === item.id),
@@ -93,10 +104,44 @@ async function openResource(item: UnitItem) {
     }
 }
 
-const itemIcon: Record<UnitItem['type'], string> = {
-    resource: 'ti-file',
-    assignment: 'ti-clipboard-text',
-    quiz: 'ti-help-circle',
+function itemHref(item: UnitItem): string | undefined {
+    if (item.type === 'assignment') return `/lms/assignments/${item.id}/entrega`;
+    if (item.type === 'quiz') return `/lms/quizzes/${item.id}/resolver`;
+    return undefined;
+}
+
+function onItemClick(event: MouseEvent, item: UnitItem) {
+    event.preventDefault();
+    if (item.type === 'resource') {
+        openResource(item);
+        return;
+    }
+    const href = itemHref(item);
+    if (href) router.visit(href);
+}
+
+const itemIcon: Record<UnitItem['type'], Component> = {
+    resource: FileText,
+    assignment: ClipboardList,
+    quiz: HelpCircle,
+};
+
+const typeLabel: Record<UnitItem['type'], string> = {
+    resource: 'Recurso',
+    assignment: 'Tarea',
+    quiz: 'Cuestionario',
+};
+
+const typeTile: Record<UnitItem['type'], string> = {
+    resource: 'from-[#1E3A5F] to-[#214EA4] text-white',
+    assignment: 'from-[#214EA4] to-[#3F7BE0] text-white',
+    quiz: 'from-[#5E97F0] to-[#8CB8FF] text-[#0B2545]',
+};
+
+const pendingHint: Record<UnitItem['type'], string> = {
+    resource: 'Pendiente de lectura',
+    assignment: 'Pendiente de entrega',
+    quiz: 'Pendiente de resolver',
 };
 
 const statusLabel: Record<string, string> = {
@@ -107,143 +152,280 @@ const statusLabel: Record<string, string> = {
     in_review: 'En revisión',
 };
 
-const statusColor: Record<string, string> = {
-    read: 'text-[#8A8A85]',
-    pending: 'text-[#D85A30]',
-    submitted: 'text-[#3B8A5A]',
-    graded: 'text-[#3B8A5A]',
-    in_review: 'text-[#D8A030]',
+const statusChip: Record<string, string> = {
+    read: 'bg-[#E8EEFB] text-[#4A5D7E]',
+    pending: 'border border-[#F2D27A] bg-[#FFF1CC] text-[#9A5B00]',
+    submitted: 'bg-emerald-100 text-emerald-700',
+    graded: 'bg-emerald-100 text-emerald-700',
+    in_review: 'bg-[#E8EEFB] text-[#214EA4]',
 };
 
-// Carga inicial: si ya hay una materia habilitada, trae su detalle de una vez.
+const units = computed(() => courseDetail.value?.units ?? []);
+
+const courseProgress = computed(
+    () => courseDetail.value?.course_progress ?? activeSubject.value?.progress ?? 0,
+);
+
+const allItems = computed(() =>
+    units.value.flatMap((unit) => unit.items.map((item) => ({ item, unit }))),
+);
+const pendingCount = computed(() => allItems.value.filter(({ item }) => item.status === 'pending').length);
+const nextPending = computed(() => allItems.value.find(({ item }) => item.status === 'pending') ?? null);
+
+const completedCount = (unit: UnitDetail) => unit.items.filter((i) => i.status !== 'pending').length;
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+function subjectClass(subject: Subject, index: number) {
+    if (index === activeSubjectIndex.value)
+        return 'border-transparent bg-gradient-to-br from-[#1E3A5F] to-[#214EA4] text-white shadow-[0_14px_26px_-14px_rgba(33,78,164,0.8)]';
+    if (subject.enabled)
+        return 'border-[#D8E2F4] bg-white text-[#0B2545] hover:border-[#214EA4]/40 hover:shadow-[0_10px_24px_-18px_rgba(30,58,95,0.5)]';
+    return 'border-dashed border-[#D8E2F4] bg-[#F6F9FE] text-[#6B7A90]';
+}
+
+function subjectTileClass(subject: Subject, index: number) {
+    if (index === activeSubjectIndex.value) return 'bg-white/20 text-white';
+    if (subject.enabled) return 'bg-[#E8EEFB] text-[#214EA4]';
+    return 'bg-[#E4ECF9] text-[#8A97AB]';
+}
+
 if (activeSubject.value?.enabled) {
     selectSubject(activeSubjectIndex.value);
 }
+
+useLmsBanner(() =>
+    activeSubject.value
+        ? {
+              tag: { label: 'Curso', icon: BookOpen },
+              title: activeSubject.value.subject_name,
+              teacher: activeSubject.value.enabled ? activeSubject.value.teacher_name : null,
+              chips:
+                  activeSubject.value.enabled && courseDetail.value
+                      ? [
+                            { label: plural(units.value.length, 'unidad', 'unidades') },
+                            { label: plural(allItems.value.length, 'actividad', 'actividades') },
+                            { label: plural(pendingCount.value, 'pendiente', 'pendientes') },
+                        ]
+                      : [],
+              ring: activeSubject.value.enabled
+                  ? {
+                        text: `${courseProgress.value}%`,
+                        caption: 'completado del curso',
+                        progress: courseProgress.value,
+                    }
+                  : null,
+          }
+        : null,
+);
+
 </script>
 
 <template>
-    <StudentLmsLayout title="Mis materias">
-        <div class="grid grid-cols-[220px_1fr] gap-6">
-            <!-- Sidebar de materias -->
-            <div class="flex flex-col gap-1.5">
+    <div class="grid gap-6 lg:grid-cols-[310px_1fr]">
+        <Head title="Mis materias" />
+        <!-- Sidebar de materias -->
+        <div>
+            <p class="mb-2.5 ml-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#6B7A90]">Mis cursos</p>
+
+            <div class="flex flex-col gap-3">
                 <button
                     v-for="(subject, index) in subjects"
                     :key="subject.section_id"
                     type="button"
                     :disabled="!subject.enabled"
-                    class="rounded-lg px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed"
-                    :class="
-                        index === activeSubjectIndex
-                            ? 'bg-[#1E3A5F]'
-                            : subject.enabled
-                              ? 'bg-white hover:bg-[#F0F3F8]'
-                              : 'bg-white/60'
-                    "
+                    :title="!subject.enabled ? (subject.disabled_message ?? undefined) : undefined"
+                    class="flex w-full items-center gap-3 rounded-[18px] border px-4 py-4 text-left transition disabled:cursor-not-allowed"
+                    :class="subjectClass(subject, index)"
                     @click="subject.enabled && selectSubject(index)"
                 >
-                    <p
-                        class="text-[13px] font-medium"
-                        :class="index === activeSubjectIndex ? 'text-white' : 'text-[#1E3A5F]'"
+                    <span
+                        class="grid size-[46px] shrink-0 place-items-center rounded-[13px]"
+                        :class="subjectTileClass(subject, index)"
                     >
-                        {{ subject.subject_name }}
-                    </p>
+                        <BookOpen v-if="subject.enabled" class="size-5" />
+                        <Lock v-else class="size-[18px]" />
+                    </span>
 
-                    <div
-                        v-if="subject.enabled"
-                        class="mt-1.5 h-1 rounded-full"
-                        :class="index === activeSubjectIndex ? 'bg-white/25' : 'bg-[#EEF1F6]'"
-                    >
-                        <div
-                            class="h-full rounded-full"
-                            :class="index === activeSubjectIndex ? 'bg-[#93C5FD]' : 'bg-[#214EA4]'"
-                            :style="{ width: `${subject.progress ?? 0}%` }"
-                        />
-                    </div>
-                    <p v-else class="mt-1 text-[11px] text-[#8A8A85]">No disponible</p>
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-[15px] font-semibold leading-tight">
+                            {{ subject.subject_name }}
+                        </span>
+
+                        <template v-if="subject.enabled">
+                            <span
+                                class="mt-2 block h-[5px] overflow-hidden rounded-full"
+                                :class="index === activeSubjectIndex ? 'bg-white/25' : 'bg-[#E4ECF9]'"
+                            >
+                                <span
+                                    class="block h-full rounded-full transition-all duration-500"
+                                    :class="
+                                        index === activeSubjectIndex
+                                            ? 'bg-[#8CB8FF]'
+                                            : 'bg-gradient-to-r from-[#1E3A5F] to-[#214EA4]'
+                                    "
+                                    :style="{ width: `${subject.progress ?? 0}%` }"
+                                />
+                            </span>
+                            <span
+                                class="mt-1.5 block text-[12.5px]"
+                                :class="index === activeSubjectIndex ? 'text-[#B9CDEE]' : 'text-[#6B7A90]'"
+                            >
+                                {{ subject.progress ?? 0 }}% completado
+                            </span>
+                        </template>
+
+                        <span
+                            v-else
+                            class="mt-1.5 inline-flex rounded-full bg-[#E8EEFB] px-2.5 py-0.5 text-[11px] font-medium text-[#6B7A90]"
+                        >
+                            No disponible
+                        </span>
+                    </span>
                 </button>
             </div>
+        </div>
 
-            <!-- Panel principal -->
-            <div v-if="activeSubject">
-                <div
-                    v-if="!activeSubject.enabled"
-                    class="rounded-xl border border-[#EAEAE5] bg-white p-4 text-sm text-[#5B6B82]"
-                >
-                    {{ activeSubject.disabled_message }}
+        <!-- Panel principal -->
+        <div v-if="activeSubject" class="min-w-0 [&>*:first-child]:!mt-0">
+            <!-- Curso no disponible -->
+            <div
+                v-if="!activeSubject.enabled"
+                class="flex items-center gap-4 rounded-[18px] border border-dashed border-[#D8E2F4] bg-white p-7"
+            >
+                <span class="grid size-[46px] shrink-0 place-items-center rounded-[13px] bg-[#E4ECF9] text-[#8A97AB]">
+                    <Lock class="size-5" />
+                </span>
+                <div>
+                    <p class="text-base font-semibold text-[#0B2545]">Curso no disponible</p>
+                    <p class="mt-0.5 text-sm text-[#5B6B82]">
+                        {{ activeSubject.disabled_message ?? 'Este curso aún no está disponible.' }}
+                    </p>
+                </div>
+            </div>
+
+            <template v-else>
+
+                <!-- Cargando -->
+                <div v-if="loadingDetail" class="mt-[18px] space-y-3">
+                    <div class="h-[92px] animate-pulse rounded-[18px] bg-white/70"></div>
+                    <div class="h-[200px] animate-pulse rounded-[18px] bg-white/70"></div>
                 </div>
 
                 <template v-else>
-                    <div class="mb-3.5 rounded-xl border border-[#EAEAE5] bg-white p-4">
-                        <p class="lms-wordmark text-[17px] text-[#1E3A5F]">
-                            {{ activeSubject.subject_name }}
-                        </p>
-                        <p class="mb-2.5 text-xs text-[#5B6B82]">{{ activeSubject.teacher_name }}</p>
-                        <div class="h-1.5 rounded-full bg-[#EEF1F6]">
-                            <div
-                                class="h-full rounded-full bg-[#214EA4]"
-                                :style="{ width: `${courseDetail?.course_progress ?? activeSubject.progress ?? 0}%` }"
-                            />
+                    <!-- Siguiente actividad -->
+                    <div
+                        v-if="nextPending"
+                        class="mt-[18px] flex flex-wrap items-center gap-[18px] rounded-[18px] border border-l-[5px] border-[#D8E2F4] border-l-[#F2A81D] bg-white px-7 py-5 shadow-[0_10px_24px_-18px_rgba(30,58,95,0.5)]"
+                    >
+                        <span
+                            class="grid size-[54px] shrink-0 place-items-center rounded-[15px] bg-gradient-to-br from-[#F2A81D] to-[#F5C04A] text-white"
+                        >
+                            <component :is="itemIcon[nextPending.item.type]" class="size-6" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs font-semibold uppercase tracking-[0.06em] text-[#B26E00]">
+                                Siguiente actividad
+                            </p>
+                            <p class="mt-0.5 truncate text-[18.5px] font-semibold text-[#0B2545]">
+                                {{ nextPending.item.title }}
+                            </p>
+                            <p class="mt-0.5 text-sm text-[#5B6B82]">
+                                {{ nextPending.unit.name }} · {{ pendingHint[nextPending.item.type] }}
+                            </p>
                         </div>
-                        <p class="mt-1.5 text-[11px] text-[#8A8A85]">
-                            {{ courseDetail?.course_progress ?? activeSubject.progress ?? 0 }}% completado del curso
-                        </p>
+                        <a
+                            :href="itemHref(nextPending.item)"
+                            class="inline-flex h-12 cursor-pointer items-center gap-2 rounded-[13px] bg-gradient-to-r from-[#1E3A5F] to-[#214EA4] px-6 text-[15px] font-medium text-white shadow-[0_10px_20px_-10px_rgba(33,78,164,0.8)] transition hover:brightness-110"
+                            @click="onItemClick($event, nextPending.item)"
+                        >
+                            Continuar
+                            <ArrowRight class="size-4" />
+                        </a>
                     </div>
 
-                    <p v-if="loadingDetail" class="text-sm text-[#8A8A85]">Cargando…</p>
-
-                    <div v-else class="flex flex-col gap-2">
+                    <!-- Unidades -->
+                    <div class="mt-[18px] flex flex-col gap-4">
                         <div
-                            v-for="unit in courseDetail?.units ?? []"
+                            v-if="units.length === 0"
+                            class="rounded-[18px] border border-[#D8E2F4] bg-white p-7 text-sm text-[#5B6B82]"
+                        >
+                            Este curso aún no tiene unidades publicadas.
+                        </div>
+
+                        <div
+                            v-for="(unit, ui) in units"
                             :key="unit.id"
-                            class="overflow-hidden rounded-lg border border-[#EAEAE5] bg-white"
+                            class="overflow-hidden rounded-[18px] border border-[#D8E2F4] bg-white shadow-[0_10px_24px_-18px_rgba(30,58,95,0.5)]"
                         >
                             <button
                                 type="button"
-                                class="flex w-full items-center justify-between px-3.5 py-2.5"
+                                class="flex w-full items-center gap-4 px-7 py-5 text-left"
                                 @click="toggleUnit(unit.id)"
                             >
-                                <span class="text-[13px] font-medium text-[#1E3A5F]">{{ unit.name }}</span>
-                                <span class="flex items-center gap-2">
-                                    <span class="text-[11px] text-[#8A8A85]">{{ unit.progress }}%</span>
-                                    <i
-                                        class="ti ti-chevron-down text-[16px] text-[#214EA4] transition-transform"
-                                        :class="{ 'rotate-180': openUnitIds.has(unit.id) }"
+                                <span
+                                    class="grid size-[46px] shrink-0 place-items-center rounded-[13px] bg-gradient-to-br from-[#1E3A5F] to-[#214EA4] text-[15px] font-semibold text-white"
+                                >
+                                    {{ ui + 1 }}
+                                </span>
+
+                                <span class="min-w-0 flex-1">
+                                    <span class="block truncate text-lg font-semibold text-[#0B2545]">{{ unit.name }}</span>
+                                    <span class="mt-0.5 block text-[13.5px] text-[#5B6B82]">
+                                        {{ plural(unit.items.length, 'actividad', 'actividades') }} ·
+                                        {{ plural(completedCount(unit), 'completada', 'completadas') }}
+                                    </span>
+                                </span>
+
+                                <span class="hidden h-[9px] w-[260px] overflow-hidden rounded-full bg-[#E4ECF9] md:block">
+                                    <span
+                                        class="block h-full rounded-full bg-gradient-to-r from-[#1E3A5F] via-[#214EA4] to-[#8CB8FF] transition-all duration-500"
+                                        :style="{ width: `${unit.progress}%` }"
                                     />
                                 </span>
+                                <span class="rounded-full bg-[#E8EEFB] px-2.5 py-[3px] text-[13px] font-semibold tabular-nums text-[#214EA4]">
+                                    {{ unit.progress }}%
+                                </span>
+                                <ChevronDown
+                                    class="size-[18px] shrink-0 text-[#6B7A90] transition-transform"
+                                    :class="{ 'rotate-180': openUnitIds.has(unit.id) }"
+                                />
                             </button>
 
-                            <div v-if="openUnitIds.has(unit.id)" class="px-3.5 pb-2.5">
+                            <div v-if="openUnitIds.has(unit.id)">
                                 <a
                                     v-for="item in unit.items"
                                     :key="`${item.type}-${item.id}`"
-                                    :href="
-                                        item.type === 'assignment'
-                                            ? `/lms/assignments/${item.id}/entrega`
-                                            : item.type === 'quiz'
-                                              ? `/lms/quizzes/${item.id}/resolver`
-                                              : undefined
-                                    "
-                                    class="flex items-center gap-2.5 border-t border-[#EAEAE5] py-1.5 hover:bg-[#F7F9FC]"
-                                    @click="item.type === 'resource' ? ($event.preventDefault(), openResource(item)) : null"
+                                    :href="itemHref(item)"
+                                    class="flex cursor-pointer items-center gap-4 border-t border-[#EAF0FB] px-7 py-[18px] transition hover:bg-[#F4F7FD]"
+                                    @click="onItemClick($event, item)"
                                 >
-                                    <i :class="['ti', itemIcon[item.type], 'text-[15px] text-[#214EA4]']" />
-                                    <span class="flex-1 text-[12.5px] text-[#1E3A5F]">{{ item.title }}</span>
-                                    <span class="text-[10.5px]" :class="statusColor[item.status]">
-                                        {{ statusLabel[item.status] }}
+                                    <span
+                                        :class="[typeTile[item.type], 'grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br']"
+                                    >
+                                        <component :is="itemIcon[item.type]" class="size-[18px]" />
+                                    </span>
+
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block truncate text-base font-medium text-[#0B2545]">{{ item.title }}</span>
+                                        <span class="mt-0.5 block text-[13px] text-[#6B7A90]">{{ typeLabel[item.type] }}</span>
+                                    </span>
+
+                                    <span
+                                        :class="[statusChip[item.status] ?? 'bg-[#E8EEFB] text-[#4A5D7E]', 'rounded-full px-3.5 py-1 text-[13px] font-medium']"
+                                    >
+                                        {{ statusLabel[item.status] ?? item.status }}
+                                    </span>
+
+                                    <span class="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[#E8EEFB]">
+                                        <ArrowRight class="size-[15px] text-[#214EA4]" />
                                     </span>
                                 </a>
                             </div>
                         </div>
                     </div>
                 </template>
-            </div>
+            </template>
         </div>
-    </StudentLmsLayout>
+    </div>
 </template>
-
-<style scoped>
-.lms-wordmark {
-    font-family: 'Fraunces', serif;
-    font-weight: 500;
-}
-</style>

@@ -10,7 +10,7 @@ use Modules\LMS\Models\AssignmentSubmission;
 class GradeSyncService
 {
     /**
-     * Integración Punto 2 (Opción A): la nota calificada en el LMS se
+     * Integración: la nota calificada en el LMS se
      * escribe directamente en Grade del ISI. No hay doble captura.
      *
      * Ruta para encontrar el EnrollmentItem correcto:

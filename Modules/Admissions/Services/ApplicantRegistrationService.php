@@ -8,10 +8,14 @@ use Modules\Admissions\Models\Applicant;
 
 class ApplicantRegistrationService
 {
+    public function __construct(
+        private readonly ApplicantEmailVerificationService $verificationService
+    ) {}
+
     /**
-     * Registro inicial — Punto 1. Solo lo mínimo para tener acceso
+     * Registro inicial. Solo lo mínimo para tener acceso
      * (User + Applicant en 'borrador'). Los datos completos de Person
-     * (Punto 2) se llenan después, ya logueado.
+     * se llenan después, ya logueado.
      */
     public function register(array $data): Applicant
     {
@@ -25,11 +29,15 @@ class ApplicantRegistrationService
         // sistema) — igual que 'admin'/'docente'/'estudiante'.
         $user->assignRole('aspirante');
 
-        return Applicant::create([
+        $applicant = Applicant::create([
             'user_id'          => $user->id,
             'career_id'        => $data['career_id'],
             'status'           => 'borrador',
             'last_activity_at' => now(),
         ]);
+
+        $this->verificationService->send($user);
+
+        return $applicant;
     }
 }

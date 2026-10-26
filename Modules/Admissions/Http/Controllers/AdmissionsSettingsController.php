@@ -4,6 +4,7 @@ namespace Modules\Admissions\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Admissions\Http\Requests\UpdateAdmissionsSettingsRequest;
@@ -11,8 +12,10 @@ use Modules\Admissions\Models\AdmissionsSetting;
 
 class AdmissionsSettingsController extends Controller
 {
-    public function edit(): Response
+    public function edit(Request $request): Response
     {
+        abort_unless($request->user()?->hasAnyRole('admin', 'super-admin'), 403);
+
         $settings = AdmissionsSetting::current();
 
         return Inertia::render('admissions/staff/Settings', [

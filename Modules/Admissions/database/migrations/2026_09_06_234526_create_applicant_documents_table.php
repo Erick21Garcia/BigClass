@@ -15,7 +15,6 @@ return new class extends Migration
                 ->constrained('applicants')
                 ->cascadeOnDelete();
 
-            // Punto 2: los 4 tipos fijos, ni uno más.
             $table->enum('type', ['cedula', 'titulo_bachiller', 'foto', 'comprobante_pago']);
 
             $table->string('file_path');

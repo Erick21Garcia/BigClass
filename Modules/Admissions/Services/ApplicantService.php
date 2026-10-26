@@ -12,7 +12,7 @@ class ApplicantService
     private const PERSONAL_FIELDS = [
         'first_name', 'second_name', 'first_surname', 'second_surname',
         'identification_number', 'phone', 'cellphone', 'birthdate', 'place_birth',
-        'main_street', 'secondary_street', 'neighborhood', 'reference',
+        'main_street', 'secondary_street', 'neighborhood',
         'marital_status_id', 'type_identification_id', 'sex_id', 'nationality_id',
         'education_level_id', 'countries_id', 'provinces_id', 'cities_id',
     ];
@@ -28,9 +28,9 @@ class ApplicantService
     }
 
     /**
-     * Envío final — Punto 2. Solo se puede enviar si están los 4
+     * Envío final. Solo se puede enviar si están los 4
      * documentos Y los datos personales completos. Pasa de 'borrador' a
-     * 'recibida' (entra al Kanban del Punto 4).
+     * 'recibida'.
      */
     public function submit(Applicant $applicant): Applicant
     {

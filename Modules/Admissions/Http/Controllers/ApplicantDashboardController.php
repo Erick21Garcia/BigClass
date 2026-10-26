@@ -18,7 +18,7 @@ class ApplicantDashboardController extends Controller
     ) {}
 
     /**
-     * Panel del aspirante — checklist de documentos + estado, Punto 2.
+     * Panel del aspirante — checklist de documentos + estado.
      */
     public function show(Request $request): Response
     {
@@ -48,6 +48,8 @@ class ApplicantDashboardController extends Controller
                 'document' => $applicant->documents->firstWhere('type', $type)?->only(['id', 'original_name']),
             ]),
             'can_edit' => $applicant->status === 'borrador',
+            'email' => $request->user()->email,
+            'email_verified' => $request->user()->hasVerifiedEmail(),
             // Catálogos para los <select> del formulario de datos personales.
             'catalogs' => [
                 'marital_statuses'      => \App\Models\MaritalStatus::get(['id', 'name']),

@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('virtual_courses', function (Blueprint $table) {
             $table->id();
 
-            // 1 a 1 con Section del módulo Academic (ISI) — ver Punto 1 del diseño.
+            // 1 a 1 con Section del módulo Academic (ISI).
             $table->foreignId('section_id')
                 ->unique()
                 ->constrained('sections')

@@ -3,20 +3,19 @@
 namespace Modules\Admissions\Services;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Academic\Models\AcademicPeriod;
-use Modules\Academic\Models\Enrollment;
 use Modules\Admissions\Models\Applicant;
-use Modules\Institucion\Models\Semester;
 use Modules\People\Models\Person;
 use Modules\People\Models\Student;
 
 class AdmissionConversionService
 {
     /**
-     * Conversión automática al aprobar — Punto 5. Crea Person + Student +
-     * Enrollment real, reutilizando el User que el aspirante ya tenía
-     * desde el registro (Punto 1). Todo en una transacción: si algo
-     * falla a medias, no se queda un Person huérfano sin Student.
+     * Conversión automática al aprobar. Crea Person + Student
+     * reutilizando el User que el aspirante ya tenía desde el registro.
+     *
+     * NO crea la matrícula: esa la hace el staff con el flujo manual del ISI
+     * (/enrollments/create), que valida prerrequisitos, cupos y horarios.
+     * Todo en una transacción: si algo falla, no queda un Person huérfano.
      */
     public function convertToStudent(Applicant $applicant): Student
     {
@@ -43,6 +42,7 @@ class AdmissionConversionService
                 'main_street'             => $applicant->main_street,
                 'secondary_street'        => $applicant->secondary_street,
                 'neighborhood'            => $applicant->neighborhood,
+                'reference'               => $applicant->reference,
                 'marital_status_id'       => $applicant->marital_status_id,
                 'type_identification_id'  => $applicant->type_identification_id,
                 'sex_id'                  => $applicant->sex_id,
@@ -57,35 +57,6 @@ class AdmissionConversionService
                 'person_id'         => $person->id,
                 'enrollment_number' => $this->generateEnrollmentNumber(),
                 'active'            => true,
-            ]);
-
-            $activePeriod = AcademicPeriod::active()->first();
-
-            if (! $activePeriod) {
-                throw new \RuntimeException('No hay un periodo académico activo — no se puede crear la matrícula.');
-            }
-
-            $firstSemester = Semester::where('career_id', $applicant->career_id)
-                ->where('number', 1)
-                ->first();
-
-            if (! $firstSemester) {
-                throw new \RuntimeException("La carrera '{$applicant->career->name}' no tiene un Semestre 1 configurado.");
-            }
-
-            // NOTA (pendiente marcado en el diseño): esto crea la
-            // matrícula general, pero NO las EnrollmentItem por materia
-            // — esas requieren asignar Section (paralelo) por materia,
-            // lo cual el staff completa manualmente después desde el
-            // flujo de matrícula que ya existe en el ISI.
-            Enrollment::create([
-                'student_id'          => $student->id,
-                'career_id'           => $applicant->career_id,
-                'semester_id'         => $firstSemester->id,
-                'academic_period_id'  => $activePeriod->id,
-                'enrollment_date'     => now(),
-                'type'                => 'regular',
-                'status'              => 'active',
             ]);
 
             // El User deja de ser 'aspirante' y pasa a ser 'estudiante'.

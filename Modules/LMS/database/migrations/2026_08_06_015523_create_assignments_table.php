@@ -15,8 +15,8 @@ return new class extends Migration
                 ->constrained('units')
                 ->cascadeOnDelete();
 
-            // FK al ISI — con qué parámetro de evaluación se integra la nota
-            // (ver Punto 2). Se valida contra evaluation_parameters existente.
+            // FK al ISI — con qué parámetro de evaluación se integra la nota.
+            // Se valida contra evaluation_parameters existente.
             $table->foreignId('evaluation_parameter_id')
                 ->constrained('evaluation_parameters')
                 ->restrictOnDelete();

@@ -2,6 +2,7 @@
 
 namespace Modules\Admissions\Services;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Modules\Admissions\Mail\ApplicationDecisionMail;
 use Modules\Admissions\Models\Applicant;
@@ -15,7 +16,7 @@ class AdmissionReviewService
     ) {}
 
     /**
-     * Mueve una tarjeta del Kanban de un estado a otro (Punto 4).
+     * Mueve una tarjeta del Kanban de un estado a otro.
      */
     public function moveStatus(Applicant $applicant, string $newStatus, ?string $notes, int $staffUserId): Applicant
     {
@@ -29,26 +30,21 @@ class AdmissionReviewService
 
         $isDecision = in_array($newStatus, ['aprobada', 'rechazada'], true);
 
-        $applicant->update([
-            'status'         => $newStatus,
-            'decision_notes' => $notes,
-            'decided_at'     => $isDecision ? now() : null,
-            'decided_by'     => $isDecision ? $staffUserId : null,
-        ]);
+        DB::transaction(function () use ($applicant, $newStatus, $notes, $staffUserId, $isDecision) {
+            $applicant->update([
+                'status'         => $newStatus,
+                'decision_notes' => $notes,
+                'decided_at'     => $isDecision ? now() : null,
+                'decided_by'     => $isDecision ? $staffUserId : null,
+            ]);
+
+            if ($newStatus === 'aprobada') {
+                $this->conversionService->convertToStudent($applicant);
+            }
+        });
 
         if ($isDecision) {
             Mail::to($applicant->user->email)->queue(new ApplicationDecisionMail($applicant));
-        }
-
-        if ($newStatus === 'aprobada') {
-            // Si la conversión falla (ej: sin periodo activo, sin
-            // Semestre 1 configurado), la excepción se propaga y el
-            // controller la captura — pero el update() de arriba ya se
-            // guardó. Es una decisión consciente: el staff SÍ aprobó,
-            // el problema es de configuración del ISI, no de la
-            // decisión de admisión en sí. Queda 'aprobada' pero sin
-            // Student creado, visible para reintentarlo.
-            $this->conversionService->convertToStudent($applicant);
         }
 
         return $applicant;

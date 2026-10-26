@@ -17,8 +17,7 @@ class SubmissionService
 
     /**
      * Crea o actualiza la entrega de un estudiante para una tarea.
-     * $files es un array de UploadedFile (múltiples archivos por entrega,
-     * según lo definido en el Punto 5).
+     * $files es un array de UploadedFile (múltiples archivos por entrega.
      */
     public function submit(Assignment $assignment, Student $student, array $files): AssignmentSubmission
     {
@@ -53,8 +52,8 @@ class SubmissionService
     }
 
     /**
-     * Califica una entrega con nota + retroalimentación (Punto 5) y
-     * sincroniza automáticamente con Grade del ISI (Punto 2, Opción A).
+     * Califica una entrega con nota + retroalimentación y
+     * sincroniza automáticamente con Grade del ISI.
      *
      * Lanza RuntimeException si el periodo académico ya está cerrado
      * (Grade.locked = true) — el controller debe capturarla y mostrar

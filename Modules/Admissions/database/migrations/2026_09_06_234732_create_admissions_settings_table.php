@@ -11,10 +11,6 @@ return new class extends Migration
         Schema::create('admissions_settings', function (Blueprint $table) {
             $table->id();
 
-            // Punto 1 (higiene de datos): ambos configurables desde el
-            // panel administrativo, sin hardcodear. Tabla de una sola
-            // fila (singleton) — más simple que key-value para solo 2
-            // valores.
             $table->unsignedInteger('abandon_after_days')->default(30);
             $table->unsignedInteger('retention_after_months')->default(3);
 

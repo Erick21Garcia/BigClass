@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { dashboard, login, register } from '@/routes';
 import { Head, Link } from '@inertiajs/vue3';
+import { ArrowRight, BookOpen, GraduationCap, ShieldCheck } from 'lucide-vue-next';
+import AcadexSplitLayout from '@/layouts/AcadexSplitLayout.vue';
 import acadexLogo from '@/acadex-logo-512.png';
+
+defineOptions({ layout: AcadexSplitLayout });
 
 withDefaults(
     defineProps<{
@@ -11,24 +15,23 @@ withDefaults(
         canRegister: true,
     },
 );
+
+const roles = [
+    { icon: ShieldCheck, title: 'Administración', text: 'Matrículas, periodos y reportes en un solo panel.' },
+    { icon: BookOpen, title: 'Docentes', text: 'Calificaciones y asistencia sin papeleo.' },
+    { icon: GraduationCap, title: 'Estudiantes', text: 'Tus notas, horarios y trámites al día.' },
+];
 </script>
 
 <template>
-    <Head title="Bienvenido">
-        <link rel="preconnect" href="https://rsms.me/" />
-        <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap"
-            rel="stylesheet"
-        />
-    </Head>
+    <div class="flex flex-col px-6 py-6 sm:px-10 lg:px-16 lg:py-9">
+        <Head title="Bienvenido" />
 
-    <div class="acadex-welcome flex min-h-screen flex-col bg-[#F7F9FC] px-6 py-6 text-[#0B2545] lg:px-10 lg:py-8">
-        <!-- Wordmark -->
         <header class="flex w-full items-center justify-between">
-            <span class="acadex-wordmark text-xl tracking-tight lg:text-2xl">Acadex</span>
+            <div class="flex items-center gap-2.5">
+                <img :src="acadexLogo" alt="" width="36" height="36" class="h-9 w-9 rounded-lg object-contain" />
+                <span class="acadex-wordmark text-xl tracking-tight lg:text-2xl">Acadex</span>
+            </div>
 
             <Link
                 v-if="$page.props.auth.user"
@@ -39,83 +42,52 @@ withDefaults(
             </Link>
         </header>
 
-        <!-- Centered stage -->
-        <main class="flex flex-1 flex-col items-center justify-center gap-8 text-center">
-            <!-- Logo importado como asset de Vite -->
-            <img
-                :src="acadexLogo"
-                alt="Acadex"
-                width="512"
-                height="512"
-                class="acadex-mark h-28 w-28 rounded-3xl object-contain shadow-[0_16px_40px_-12px_rgba(30,58,95,0.45)] lg:h-32 lg:w-32"
-            />
+        <main class="my-auto py-10">
+            <span class="inline-flex items-center gap-2 rounded-full bg-[#E8EEFB] px-3 py-1 text-xs font-medium text-[#214EA4]">
+                <span class="h-1.5 w-1.5 rounded-full bg-[#214EA4]"></span>
+                Sistema de gestión académica
+            </span>
 
-            <div class="flex flex-col items-center gap-3">
-                <h1 class="acadex-wordmark text-3xl leading-tight lg:text-4xl">
-                    Bienvenido de nuevo
-                </h1>
-                <p class="max-w-sm text-[15px] leading-relaxed text-[#5B6B82]">
-                    Un solo lugar para administración, docentes y estudiantes.
-                </p>
-            </div>
+            <h1 class="acadex-wordmark mt-5 text-4xl leading-[1.08] sm:text-5xl lg:text-[56px]">
+                Bienvenido<br />de nuevo
+            </h1>
+            <p class="mt-4 max-w-md text-base leading-relaxed text-[#5B6B82] lg:text-[17px]">
+                Un solo lugar para administración, docentes y estudiantes.
+            </p>
 
-            <div class="flex flex-col items-center gap-3">
+            <div class="mt-8 flex flex-wrap items-center gap-3">
                 <Link
                     :href="login()"
-                    class="acadex-cta inline-flex items-center gap-2 rounded-full px-7 py-3 text-[15px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(30,76,138,0.6)] transition-transform hover:-translate-y-0.5"
+                    class="group inline-flex h-[46px] items-center gap-2 rounded-full bg-gradient-to-r from-[#1E3A5F] to-[#214EA4] px-7 text-sm font-medium text-white shadow-[0_10px_24px_-10px_rgba(33,78,164,0.7)] transition hover:-translate-y-0.5"
                 >
                     Iniciar sesión
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
+                    <ArrowRight class="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </Link>
 
-                <Link
-                    v-if="canRegister"
-                    :href="register()"
-                    class="text-sm font-medium text-[#5B6B82] underline-offset-4 transition-colors hover:text-[#1E4C8A] hover:underline"
-                >
-                    Crear cuenta
+            </div>
+
+            <p class="mt-5 text-sm text-[#5B6B82]">
+                ¿Quieres estudiar con nosotros?
+                <Link href="/admisiones/registro" class="font-medium text-[#214EA4] hover:underline">
+                    Postula aquí
                 </Link>
+            </p>
+
+            <div class="mt-10 grid gap-3 sm:grid-cols-3">
+                <div
+                    v-for="r in roles"
+                    :key="r.title"
+                    class="rounded-2xl border border-[#E3E8F1] bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-12px_rgba(30,58,95,0.25)]"
+                >
+                    <div class="mb-3 grid h-9 w-9 place-items-center rounded-[10px] bg-[#E8EEFB] text-[#214EA4]">
+                        <component :is="r.icon" class="h-[18px] w-[18px]" />
+                    </div>
+                    <p class="text-sm font-medium text-[#1E3A5F]">{{ r.title }}</p>
+                    <p class="mt-1 text-xs leading-relaxed text-[#5B6B82]">{{ r.text }}</p>
+                </div>
             </div>
         </main>
 
-        <footer class="pb-2 text-center text-xs text-[#5B6B82]/70">
-            Acadex — sistema de gestión académica
-        </footer>
+        <footer class="text-xs text-[#5B6B82]/70">Acadex — sistema de gestión académica</footer>
     </div>
 </template>
-
-<style scoped>
-.acadex-wordmark {
-    font-family: 'Fraunces', serif;
-    font-weight: 600;
-    color: #0b2545;
-}
-
-.acadex-cta {
-    background: linear-gradient(135deg, #1e4c8a, #4c7fc2);
-}
-
-.acadex-mark {
-    animation: acadex-rise 700ms ease-out both;
-}
-
-@keyframes acadex-rise {
-    from {
-        opacity: 0;
-        transform: translateY(10px) scale(0.94);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .acadex-mark {
-        animation: none;
-        opacity: 1;
-    }
-}
-</style>

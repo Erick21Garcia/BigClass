@@ -17,24 +17,22 @@ class ApplicantRegistrationController extends Controller
         private readonly ApplicantRegistrationService $registrationService
     ) {}
 
-    /**
-     * Formulario público de registro — Punto 1.
-     */
     public function create(): Response
     {
         return Inertia::render('admissions/Register', [
-            'careers' => Career::where('active', true)->get(['id', 'name']),
+            'careers'            => Career::where('active', true)->get(['id', 'name']),
+            'turnstile_site_key' => config('services.turnstile.site_key'),
         ]);
     }
 
     public function store(RegisterApplicantRequest $request): RedirectResponse
     {
-        $applicant = $this->registrationService->register($request->validated());
+        $applicant = $this->registrationService->register(
+            collect($request->validated())->except('captcha_token')->all()
+        );
 
         Auth::login($applicant->user);
 
-        // Punto 2 (formulario de postulación completo) define esta ruta
-        // de destino — por ahora apunta al panel del aspirante.
         return redirect()->route('admissions.applicant.dashboard');
     }
 }

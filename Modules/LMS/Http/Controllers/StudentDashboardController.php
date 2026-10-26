@@ -21,8 +21,7 @@ class StudentDashboardController extends Controller
     ) {}
 
     /**
-     * Página inicial "Mis materias" — Inertia, carga todo de una vez
-     * (Punto 3 del backlog: Opción B, esta parte es la mitad Inertia).
+     * Página inicial "Mis materias" — Inertia, carga todo de una vez.
      */
     public function index(Request $request): Response
     {
@@ -44,8 +43,6 @@ class StudentDashboardController extends Controller
             $section = $item->section;
             $virtualCourse = $section?->virtualCourse;
 
-            // Punto 1.a del backlog: sin VirtualCourse o no publicado =
-            // materia deshabilitada, no oculta.
             $enabled = (bool) ($virtualCourse && $virtualCourse->is_published);
 
             return [
@@ -55,7 +52,6 @@ class StudentDashboardController extends Controller
                 'teacher_name'      => $section->teacher?->person?->full_name,
                 'enabled'           => $enabled,
                 'disabled_message'  => $enabled ? null : 'El docente aún no ha activado esta materia.',
-                // Punto 1.b: progreso calculado aquí mismo, una vez por materia.
                 'progress'          => $enabled
                     ? $this->progressService->courseProgress($virtualCourse, $student)
                     : null,
@@ -69,8 +65,7 @@ class StudentDashboardController extends Controller
 
     /**
      * Detalle de una materia + sus Unidades con estado por ítem — JSON,
-     * consumido al hacer clic en el sidebar o abrir una Unidad (Punto 3
-     * del backlog: Opción B, esta parte es la mitad sin recargar).
+     * consumido al hacer clic en el sidebar o abrir una Unidad.
      */
     public function show(Request $request, VirtualCourse $virtualCourse): JsonResponse
     {

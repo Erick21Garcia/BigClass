@@ -58,7 +58,7 @@ class ProgressService
     /**
      * Detalle por ítem de una Unidad para el acordeón del frontend.
      * Estados: recurso 'read'|'pending'; tarea 'submitted'|'pending'
-     * (la nota NO se expone aquí — Punto 2 del backlog); cuestionario
+     * (la nota NO se expone aquí); cuestionario
      * 'graded'|'in_review'|'pending'.
      */
     public function unitItemsStatus(Unit $unit, Student $student): array
@@ -121,7 +121,7 @@ class ProgressService
     }
 
     /**
-     * Contador combinado (Punto 1 del backlog docente): tareas entregadas
+     * Contador combinado: tareas entregadas
      * sin calificar + cuestionarios en pending_review, sumados en un solo
      * número, para toda la materia.
      */
